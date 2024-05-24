@@ -1,30 +1,43 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 from openai import OpenAI
-import os
 from dotenv import load_dotenv
+import os
 
-load_dotenv()
+load_dotenv()  # Load environment variables from .env file
 
-# Get the API key from the environment variable
+app = Flask(__name__)
+
 api_key = os.getenv('OPENAI_API_KEY')
-
 if not api_key:
     raise ValueError("No OPENAI_API_KEY found in environment variables")
 
 client = OpenAI(api_key=api_key)
-app = Flask(__name__)
 
-# openai.api_key = os.getenv(OPENAI_API_KEY)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.get_json()
-    user_message = data.get("message")
+@app.route('/submit', methods=['POST'])
+def submit():
+    noun = request.form['noun']
+    verb = request.form['verb']
+    adjective = request.form['adjective']
+    adverb = request.form['adverb']
+
+    prompt = f"Create a short story with a {adjective} {noun} who loves to {verb} {adverb}."
 
     try:
-        response = client.chat.completions.create(model="gpt-3.5-turbo",  # or the model you are using
-        messages=[{"role": "user", "content": user_message}])
-        return jsonify(response.choices[0].message.content.strip())
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Specify the model
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100 
+           # Add max_tokens to limit the length of the completion
+        )
+
+        print(response)
+        story = response.choices[0].message.content.strip()
+
+        return render_template('index.html', story=story)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
