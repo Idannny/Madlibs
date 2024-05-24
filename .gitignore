@@ -1,0 +1,8 @@
+
+# Ignore virtual environment
+venv/
+
+# Ignore IDE configuration files
+.vscode/
+
+.env
