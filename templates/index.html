@@ -10,15 +10,18 @@
 <body>
     <h1>Mad Libs Game with ChatGPT</h1>
     <form action="{{ url_for('submit') }}" method="post">
+        
         <label for="artstyle">Image Art Style:</label>
         <select id="artstyle" name="artstyle">
             <option value="abstract">Abstract</option>
             <option value="realism">Realism</option>
             <option value="impressionism">Impressionism</option>
             <option value="cubism">Cubism</option>
+            <option value="Cartoon">Cartoon</option>
+            <option value="Gothic">Gothic</option>
             <!-- Add more options as needed -->
         </select><br>
-        
+
         <label for="noun">Noun:</label>
         <input type="text" id="noun" name="noun" required><br>
 
