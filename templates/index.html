@@ -5,32 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mad Libs Game with ChatGPT</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+ 
 </head>
 <body>
     <h1>Mad Libs Game with ChatGPT</h1>
     <form action="{{ url_for('submit') }}" method="post">
-
         <label for="noun">Noun:</label>
         <input type="text" id="noun" name="noun" required><br>
-
         <label for="verb">Verb:</label>
         <input type="text" id="verb" name="verb" required><br>
-
         <label for="adjective">Adjective:</label>
         <input type="text" id="adjective" name="adjective" required><br>
-
         <label for="adverb">Adverb:</label>
         <input type="text" id="adverb" name="adverb" required><br>
-
         <button type="submit">Submit</button>
-
     </form>
     {% if story %}
     <h2>Your Mad Libs Story:</h2>
     <p>{{ story }}</p>
     {% endif %}
 
+    {% if image %}
     <img src={{ image }} alt="DALL-E Image">
-
+    {% endif %}
 </body>
 </html>
