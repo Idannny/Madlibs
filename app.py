@@ -23,9 +23,13 @@ def submit():
     verb = request.form['verb']
     adjective = request.form['adjective']
     adverb = request.form['adverb']
-
-    prompt = f"Create a short 100 word story with a {adjective} {noun} who loves to {verb} {adverb}."
-
+    number = request.form['number']
+    bodypart = request.form['bodypart']
+    artstyle = request.form['artstyle']
+    # number = 1
+    # bodypart = "mouth"
+    prompt = f"Create a short 100 word story with bodypart - {bodypart} adjective - {adjective} noun - {noun} verb - {verb} adverb - {adverb} number - {number} integrated in the story."
+    imagePrompt = f"Create an image based off this {prompt} based off {artstyle} "
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",  # Specify the model
@@ -38,7 +42,7 @@ def submit():
         
         D3response = client.images.generate(
             model="dall-e-3",
-            prompt=story,
+            prompt=imagePrompt,
             size="1024x1024",
             quality="standard",
             n=1,
