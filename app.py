@@ -24,22 +24,35 @@ def submit():
     adjective = request.form['adjective']
     adverb = request.form['adverb']
 
-    prompt = f"Create a short story with a {adjective} {noun} who loves to {verb} {adverb}."
+    prompt = f"Create a short 100 word story with a {adjective} {noun} who loves to {verb} {adverb}."
 
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",  # Specify the model
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100 
+            max_tokens=150,
+            stop=None 
            # Add max_tokens to limit the length of the completion
         )
-
-        print(response)
         story = response.choices[0].message.content.strip()
+        
+        D3response = client.images.generate(
+            model="dall-e-3",
+            prompt=story,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+            )
 
-        return render_template('index.html', story=story)
+        image_url = D3response.data[0].url
+        print("||Story " , story, "||")
+        print(image_url)
+
+        return render_template('index.html', story=story, image=image_url, adjective=adjective, noun=noun, verb=verb, adverb=adverb)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+
     app.run(debug=True)
