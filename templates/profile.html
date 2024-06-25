@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>User Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+ 
+
+</head>
+<body>
+    <h1>User Profile</h1>
+    {% if user %}
+        <p>Email: {{ user.email }}</p>
+        <p>Domain: {{ user.hd }}</p>
+        <p>ID: {{ user.id }}</p>
+        <p>Verified: {{ user.verified_email }}</p>
+        <img src="{{ user.picture }}" alt="User Picture">
+        <br>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+        <p>User information not available.</p>
+    {% endif %}
+</body>
+</html>
+
+{% endblock %}

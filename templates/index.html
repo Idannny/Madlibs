@@ -1,55 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mad Libs Game with ChatGPT</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
- 
-</head>
-<body>
-    <h1>Mad Libs Game with ChatGPT</h1>
-    <form action="{{ url_for('submit') }}" method="post">
-        
-        <label for="artstyle">Image Art Style:</label>
-        <select id="artstyle" name="artstyle">
-            <option value="abstract">Abstract</option>
-            <option value="realism">Realism</option>
-            <option value="impressionism">Impressionism</option>
-            <option value="cubism">Cubism</option>
-            <option value="Cartoon">Cartoon</option>
-            <option value="Gothic">Gothic</option>
-            <!-- Add more options as needed -->
-        </select><br>
+{% extends "base.html" %}
 
-        <label for="noun">Noun:</label>
-        <input type="text" id="noun" name="noun" required><br>
+{% block title %}Ad-Lib Game with ChatGPT{% endblock %}
 
-        <label for="verb">Verb:</label>
-        <input type="text" id="verb" name="verb" required><br>
+{% block content %}
 
-        <label for="adjective">Adjective:</label>
-        <input type="text" id="adjective" name="adjective" required><br>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<h1>Ad-Lib Game with ChatGPT</h1>
+<form action="{{ url_for('submit') }}" method="post">
+    <label for="artstyle">Image Art Style:</label>
+    <select id="artstyle" name="artstyle">
+        <option value="abstract">Abstract</option>
+        <option value="realism">Realism</option>
+        <option value="impressionism">Impressionism</option>
+        <option value="cubism">Cubism</option>
+        <option value="Cartoon">Cartoon</option>
+        <option value="Gothic">Gothic</option>
+        <!-- Add more options as needed -->
+    </select><br>
 
-        <label for="adverb">Adverb:</label>
-        <input type="text" id="adverb" name="adverb" required><br>
+    <label for="noun">Noun:</label>
+    <input type="text" id="noun" name="noun" required><br>
 
-        <label for="number">Number:</label>
-        <input type="number" id="number" name="number" required><br>
-            
-        <label for="bodypart">Body Part:</label>
-        <input type="text" id="bodypart" name="bodypart" required><br>
+    <label for="verb">Verb:</label>
+    <input type="text" id="verb" name="verb" required><br>
 
-        <button type="submit">Submit</button>
+    <label for="adjective">Adjective:</label>
+    <input type="text" id="adjective" name="adjective" required><br>
 
-    </form>
-    {% if story %}
-    <h2>Your Mad Libs Story:</h2>
+    <label for="adverb">Adverb:</label>
+    <input type="text" id="adverb" name="adverb" required><br>
+
+    <label for="number">Number:</label>
+    <input type="number" id="number" name="number" required><br>
+
+    <label for="bodypart">Body Part:</label>
+    <input type="text" id="bodypart" name="bodypart" required><br>
+
+    <button type="submit" class="btn-submit">Submit</button>
+</form>
+
+{% if story %}
+    <h2>Your Ad-Lib Story:</h2>
     <p>{{ story }}</p>
-    {% endif %}
+{% endif %}
 
-    {% if image %}
-    <img src={{ image }} alt="DALL-E Image">
-    {% endif %}
-</body>
-</html>
+{% if image %}
+    <img src="{{ image }}" alt="DALL-E Image">
+{% endif %}
+{% endblock %}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Madness{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        .btn-sign-in, .btn-sign-out {
+            background-color: #4285F4; /* Google Blue */
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 4px;
+            transition-duration: 0.3s;
+        }
+
+        .btn-sign-in:hover, .btn-sign-out:hover {
+            background-color: #357AE8; /* Darker Blue */
+        }
+
+        /* Loading Screen Styles */
+        .loading-screen {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Banner -->
+    <header class="top-banner">
+        <div class="container">
+            <div class="top-banner-content">
+                <div class="logo">
+                    <a href="{{ url_for('index') }}">Madness</a>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="{{ url_for('index') }}">Purchase Tokens</a></li>
+
+                        {% if session.get('user') %}
+                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                            <li><a href="{{ url_for('logout') }}" class="btn-sign-out">Sign Out</a></li>
+                        {% else %}
+                            <li><a href="{{ url_for('login') }}" class="btn-sign-in">Sign In with Google</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <img src="{{ url_for('static', filename='images/loading.gif') }}" alt="Loading...">
+    </div>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 - Ivan Padilla</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const loadingScreen = document.getElementById('loading-screen');
+
+            form.addEventListener('submit', function() {
+                loadingScreen.style.display = 'flex';
+            });
+        });
+    </script>
+</body>
+</html>
