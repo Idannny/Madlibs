@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Canceled{% endblock %}
+
+{% block content %}
+<h1>Payment Canceled</h1>
+<p>Your transaction was canceled. Please try again.</p>
+<a href="{{ url_for('index') }}">Back to Home</a>
+{% endblock %}

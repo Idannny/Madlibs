@@ -19,7 +19,9 @@
         <p>Email: {{ user.email }}</p>
         <p>Domain: {{ user.hd }}</p>
         <p>ID: {{ user.id }}</p>
+        <p>Balance: ${{ balance }}</p>
         <p>Verified: {{ user.verified_email }}</p>
+       
         <img src="{{ user.picture }}" alt="User Picture">
         <br>
         <a href="{{ url_for('logout') }}">Logout</a>

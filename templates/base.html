@@ -57,6 +57,7 @@
                             <li><a href="{{ url_for('logout') }}" class="btn-sign-out">Sign Out</a></li>
                         {% else %}
                             <li><a href="{{ url_for('login') }}" class="btn-sign-in">Sign In with Google</a></li>
+                           
                         {% endif %}
                     </ul>
                 </nav>
@@ -91,5 +92,33 @@
             });
         });
     </script>
+
+    <!-- <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const loadingScreen = document.getElementById('loading-screen');
+
+            // Handle form submission (e.g., Purchase Tokens form)
+            if (form) {
+                form.addEventListener('submit', function() {
+                    loadingScreen.style.display = 'flex';
+                });
+            }
+
+            // Handle Sign In with Google button click
+            const signInButton = document.querySelector('.btn-sign-in');
+            if (signInButton) {
+                signInButton.addEventListener('click', function(event) {
+                    if (!session.get('user')) {
+                        event.preventDefault(); // Prevent default action (redirect)
+                        window.location.href = "{{ url_for('login') }}"; // Redirect to login route
+                        // Alternatively, you can trigger the OAuth flow here
+                    }
+                });
+            }
+        });
+    </script> -->
+
+
 </body>
 </html>

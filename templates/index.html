@@ -15,6 +15,7 @@
         <option value="cubism">Cubism</option>
         <option value="Cartoon">Cartoon</option>
         <option value="Gothic">Gothic</option>
+        <option value="StickFigure">Stick Figure</option>
         <!-- Add more options as needed -->
     </select><br>
 
@@ -47,4 +48,36 @@
 {% if image %}
     <img src="{{ image }}" alt="DALL-E Image">
 {% endif %}
+
+<form action="/create-checkout-session" method="POST">
+    <button type="submit" id="checkout-button">Checkout</button>
+</form>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    var stripe = Stripe('pk_live_51Nv7YjIZXlMiQ2QllnDGTIcgdhCpJ2K5zbtv4W2xV4NLPhkQVQwVjyCT5VSP79Ev167UoLaRJx9IyHn0bDQWhdEA00wsOS91mg');
+    var checkoutButton = document.getElementById('checkout-button');
+
+    checkoutButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        fetch('/create-checkout-session', {
+            method: 'POST',
+        })
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (sessionId) {
+            return stripe.redirectToCheckout({ sessionId: sessionId.id });
+        })
+        .then(function (result) {
+            if (result.error) {
+                alert(result.error.message);
+            }
+        })
+        .catch(function (error) {
+            console.error('Error:', error);
+        });
+    });
+</script>
+
 {% endblock %}
