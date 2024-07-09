@@ -8,9 +8,14 @@ from flask_oauthlib.client import OAuth
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
 from models import User  
+import requests
 
 load_dotenv()  # Load environment variables from .env file
 
+# Use reCAPTCHA's test keys:
+# Google provides a set of test keys that you can use during developme
+# Site key: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+# Secret key: 6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4Wif
 
 def create_app():
     app = Flask(__name__)
@@ -18,6 +23,7 @@ def create_app():
     
     app.secret_key = app.config['SECRET_KEY']
     app.stripekey = app.config['STRIPE_SECRET']
+    
     stripe.api_key = app.stripekey
 
     oauth = OAuth(app)
@@ -47,6 +53,19 @@ def create_app():
     with app.app_context():
         db.create_all()
    
+ 
+
+    def verify_recaptcha(recaptcha_response):
+        #secret_key = app.config['CAPTCHA_SECRET'] # Replace with your reCAPTCHA secret key
+        secret_key="6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4Wif"
+        verify_url = "https://www.google.com/recaptcha/api/siteverify"
+        data = {
+            "secret": secret_key,
+            "response": recaptcha_response
+        }
+        response = requests.post(verify_url, data=data)
+        result = response.json()
+        return result.get("success", False)
 
     @app.route('/login')
     def login():
@@ -135,6 +154,10 @@ def create_app():
 
     @app.route('/submit', methods=['POST'])
     def submit():
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        if not verify_recaptcha(recaptcha_response):
+            return jsonify({"error": "Please complete the CAPTCHA."}), 400
+
         if 'user' not in session:
             if 'usage_count' not in session:
                 session['usage_count'] = 0
@@ -175,7 +198,7 @@ def create_app():
             print("||Story ", story, "||")
             print(image_url)
 
-            return render_template('index.html', story=story, image=image_url, adjective=adjective, noun=noun, verb=verb, adverb=adverb)
+            return jsonify({"story": story, "image": image_url})
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
