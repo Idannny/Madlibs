@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 import stripe
 from config import Config
-from flask_oauthlib.client import OAuth
+from authlib.integrations.flask_client import OAuth
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
 from models import User  
@@ -29,18 +29,16 @@ def create_app():
     oauth = OAuth(app)
     db.init_app(app)
 
-    google = oauth.remote_app(
-        'google',
-        consumer_key=app.config['GOOGLE_CLIENT_ID'],
-        consumer_secret=app.config['GOOGLE_CLIENT_SECRET'],
-        request_token_params={
-            'scope': 'email',
-        },
-        base_url='https://www.googleapis.com/oauth2/v1/',
-        request_token_url=None,
-        access_token_method='POST',
-        access_token_url='https://accounts.google.com/o/oauth2/token',
-        authorize_url='https://accounts.google.com/o/oauth2/auth',
+    google = oauth.register(
+        name="google",
+        client_id="your_google_client_id",
+        client_secret="your_google_client_secret",
+        access_token_url="https://accounts.google.com/o/oauth2/token",
+        access_token_params=None,
+        authorize_url="https://accounts.google.com/o/oauth2/auth",
+        authorize_params=None,
+        api_base_url="https://www.googleapis.com/oauth2/v1/",
+        client_kwargs={"scope": "openid email profile"},
     )
 
     api_key = os.getenv('OPENAI_API_KEY')
@@ -52,24 +50,27 @@ def create_app():
     # Register routes and blueprints
     with app.app_context():
         db.create_all()
-   
- 
 
     def verify_recaptcha(recaptcha_response):
-        #secret_key = app.config['CAPTCHA_SECRET'] # Replace with your reCAPTCHA secret key
-        secret_key="6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4Wif"
+        secret_key = os.getenv("RECAPTCHA_SECRET", "default_test_key")
         verify_url = "https://www.google.com/recaptcha/api/siteverify"
         data = {
             "secret": secret_key,
             "response": recaptcha_response
         }
-        response = requests.post(verify_url, data=data)
-        result = response.json()
-        return result.get("success", False)
+        try:
+            response = requests.post(verify_url, data=data)
+            response.raise_for_status()
+            result = response.json()
+            return result.get("success", False)
+        except requests.RequestException as e:
+            app.logger.error(f"ReCAPTCHA verification failed: {e}")
+            return False
+
 
     @app.route('/login')
     def login():
-        return google.authorize(callback=url_for('authorized', _external=True))
+        return google.authorize_redirect(url_for("authorize", _external=True))  
 
     @app.route('/logout')
     def logout():
@@ -79,17 +80,14 @@ def create_app():
 
     @app.route('/callback')
     def authorized():
-        response = google.authorized_response()
-        if response is None or response.get('access_token') is None:
-            return 'Access denied: reason={} error={}'.format(
-                request.args['error_reason'],
-                request.args['error_description']
-            )
+        token = google.authorize_access_token()  # Retrieve the token
+        if not token:
+            return "Authorization failed.", 400
 
-        session['google_token'] = (response['access_token'], '')
-        user_info = google.get('userinfo').data
+        session['google_token'] = token  # Store token in session
+        user_info = google.get("userinfo").json()
 
-        # Check if user exists in the database
+        # Check if the user exists in the database
         user = User.query.filter_by(email=user_info['email']).first()
         if user is None:
             # Create a new user
@@ -98,7 +96,7 @@ def create_app():
             db.session.commit()
             user = new_user
 
-        session['user'] = user_info  # Store user info in session
+        session['user'] = user_info  # Save user info in session
 
         return redirect(url_for('profile'))  # Redirect to profile page
 
