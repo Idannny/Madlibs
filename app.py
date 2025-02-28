@@ -23,22 +23,21 @@ def create_app():
     
     app.secret_key = app.config['SECRET_KEY']
     app.stripekey = app.config['STRIPE_SECRET']
-    
     stripe.api_key = app.stripekey
 
     oauth = OAuth(app)
     db.init_app(app)
 
     google = oauth.register(
-        name="google",
-        client_id="your_google_client_id",
-        client_secret="your_google_client_secret",
-        access_token_url="https://accounts.google.com/o/oauth2/token",
+        name='google',
+        client_id=app.config['GOOGLE_CLIENT_ID'],
+        client_secret=app.config['GOOGLE_CLIENT_SECRET'],
+        access_token_url='https://accounts.google.com/o/oauth2/token',
         access_token_params=None,
-        authorize_url="https://accounts.google.com/o/oauth2/auth",
+        authorize_url='https://accounts.google.com/o/oauth2/auth',
         authorize_params=None,
-        api_base_url="https://www.googleapis.com/oauth2/v1/",
-        client_kwargs={"scope": "openid email profile"},
+        api_base_url='https://www.googleapis.com/oauth2/v1/',
+        client_kwargs={'scope': 'email profile'},
     )
 
     api_key = os.getenv('OPENAI_API_KEY')
@@ -70,39 +69,40 @@ def create_app():
 
     @app.route('/login')
     def login():
-        return google.authorize_redirect(url_for("authorize", _external=True))  
+        return google.authorize_redirect(url_for('authorized', _external=True))
 
     @app.route('/logout')
     def logout():
-        session.pop('google_token', None)
         session.pop('user', None)
         return redirect(url_for('index'))
 
+
+    @app.before_request
+    def load_google_token():
+        token = session.get("google_token")
+        if token:
+            google.token = token
+
     @app.route('/callback')
     def authorized():
-        token = google.authorize_access_token()  # Retrieve the token
+        token = google.authorize_access_token()
         if not token:
-            return "Authorization failed.", 400
+            return 'Access denied.'
+        
+        # Save the token in the session
+        session['google_token'] = token
 
-        session['google_token'] = token  # Store token in session
-        user_info = google.get("userinfo").json()
+        user_info = google.get('userinfo').json()
 
-        # Check if the user exists in the database
         user = User.query.filter_by(email=user_info['email']).first()
         if user is None:
-            # Create a new user
             new_user = User(email=user_info['email'], name=user_info.get('name'))
             db.session.add(new_user)
             db.session.commit()
             user = new_user
 
-        session['user'] = user_info  # Save user info in session
-
-        return redirect(url_for('profile'))  # Redirect to profile page
-
-    @google.tokengetter
-    def get_google_oauth_token():
-        return session.get('google_token')
+        session['user'] = user_info
+        return redirect(url_for('profile'))
 
     @app.route('/')
     def index():
@@ -119,7 +119,7 @@ def create_app():
                         'product_data': {
                             'name': 'Story Generation',
                         },
-                        'unit_amount': 500,  # Amount in cents (e.g., $5.00)
+                        'unit_amount': 500,  # Make sure this is dynamically set if necessary
                     },
                     'quantity': 1,
                 }],
@@ -130,6 +130,7 @@ def create_app():
             return jsonify({'id': session.id})
         except Exception as e:
             return jsonify(error=str(e)), 403
+
 
     @app.route('/success')
     def success():
@@ -152,9 +153,9 @@ def create_app():
 
     @app.route('/submit', methods=['POST'])
     def submit():
-        recaptcha_response = request.form.get('g-recaptcha-response')
-        if not verify_recaptcha(recaptcha_response):
-            return jsonify({"error": "Please complete the CAPTCHA."}), 400
+        # recaptcha_response = request.form.get('g-recaptcha-response')
+        # if not verify_recaptcha(recaptcha_response):
+        #     return jsonify({"error": "Please complete the CAPTCHA."}), 400
 
         if 'user' not in session:
             if 'usage_count' not in session:

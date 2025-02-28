@@ -51,7 +51,7 @@
     <label for="bodypart">Body Part:</label>
     <input type="text" id="bodypart" name="bodypart" required><br>
     
-    <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+    <!-- <div class="g-recaptcha" data-sitekey="6Ldnna0qAAAAAGiHhXtBzHyZl3Ew-JIgtCT9DH-f"></div> -->
   
     <button type="submit" class="btn-submit">Submit</button>
 </form>
@@ -116,7 +116,9 @@ document.addEventListener('DOMContentLoaded', function() {
         resultDiv.style.display = 'none';
 
         let formData = new FormData(form);
-        formData.append('g-recaptcha-response', grecaptcha.getResponse());
+        
+        // formData.append('g-recaptcha-response', grecaptcha.getResponse());
+    
 
         fetch('{{ url_for("submit") }}', {
             method: 'POST',
