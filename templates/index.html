@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Ad-Lib Game with ChatGPT{% endblock %}
+{% block title %}Ad-Lib Game AI Generated :3 {% endblock %}
 
 {% block content %}
 
@@ -126,10 +126,14 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            loadingScreen.style.display = 'none';
-            grecaptcha.reset();
+	    
+	    console.log("Recieved Data", data)	
+            
+	    loadingScreen.style.display = 'none';
+            //grecaptcha.reset();
             if (data.error) {
-                alert(data.error);
+                console.log("data error",data.error  )
+		alert(data.error);
             } else {
                 // Update the page with the story and image
                 document.querySelector('#story').textContent = data.story;

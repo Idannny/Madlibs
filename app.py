@@ -3,7 +3,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import stripe
-from config import Config
 from authlib.integrations.flask_client import OAuth
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
@@ -19,19 +18,20 @@ load_dotenv()  # Load environment variables from .env file
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object(Config)
-    
-    app.secret_key = app.config['SECRET_KEY']
-    app.stripekey = app.config['STRIPE_SECRET']
-    stripe.api_key = app.stripekey
+
+    app.secret_key = os.getenv('SECRET_KEY')
+    app.stripekey = os.getenv('STRIPE_SECRET')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+   
 
     oauth = OAuth(app)
     db.init_app(app)
 
     google = oauth.register(
         name='google',
-        client_id=app.config['GOOGLE_CLIENT_ID'],
-        client_secret=app.config['GOOGLE_CLIENT_SECRET'],
+        client_id=os.getenv('GOOGLE_CLIENT_ID'),
+        client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
         access_token_url='https://accounts.google.com/o/oauth2/token',
         access_token_params=None,
         authorize_url='https://accounts.google.com/o/oauth2/auth',
@@ -158,8 +158,9 @@ def create_app():
         #     return jsonify({"error": "Please complete the CAPTCHA."}), 400
 
         if 'user' not in session:
+
             if 'usage_count' not in session:
-                session['usage_count'] = 0
+                session['usage_count'] = 1
             if session['usage_count'] >= 3:
                 return jsonify({"error": "You have reached the maximum number of free uses."}), 403
             session['usage_count'] += 1
