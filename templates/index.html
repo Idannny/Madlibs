@@ -7,6 +7,14 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <h1>Ad-Lib Game with ChatGPT</h1>
 
+<!-- Add this near the top of your body -->
+<div class="loading-screen" style="display: none;">
+    <div class="loading-content">
+        <img src="{{ url_for('static', filename='loading.gif') }}" alt="Loading...">
+        <p>Generating your story...</p>
+    </div>
+</div>
+
 {% if 'user' not in session %}
     {% if session.get('usage_count', 0) < 3 %}
         <p>You have {{ 3 - session.get('usage_count', 0) }} free tries remaining. Sign in for unlimited use.</p>
@@ -19,8 +27,9 @@
     <p class="error">{{ error }}</p>
 {% endif %}
 
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
-<form action="{{ url_for('submit') }}" method="post">
+<form action="{{ url_for('submit') }}" method="post" id="submit-form">
     <label for="artstyle">Image Art Style:</label>
     <select id="artstyle" name="artstyle">
         <option value="abstract">Abstract</option>
@@ -51,8 +60,8 @@
     <label for="bodypart">Body Part:</label>
     <input type="text" id="bodypart" name="bodypart" required><br>
     
-    <!-- <div class="g-recaptcha" data-sitekey="6Ldnna0qAAAAAGiHhXtBzHyZl3Ew-JIgtCT9DH-f"></div> -->
-  
+    <div class="g-recaptcha" data-sitekey="{{ config['RECAPTCHA_SITE_KEY'] }}"></div>
+    
     <button type="submit" class="btn-submit">Submit</button>
 </form>
 
@@ -78,64 +87,104 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-    var stripe = Stripe('pk_live_51Nv7YjIZXlMiQ2QllnDGTIcgdhCpJ2K5zbtv4W2xV4NLPhkQVQwVjyCT5VSP79Ev167UoLaRJx9IyHn0bDQWhdEA00wsOS91mg');
+    var stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
     var checkoutButton = document.getElementById('checkout-button');
 
-    checkoutButton.addEventListener('click', function (e) {
+    checkoutButton.addEventListener('click', function(e) {
         e.preventDefault();
+        
+        checkoutButton.disabled = true;
+        checkoutButton.textContent = 'Processing...';
+
         fetch('/create-checkout-session', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         })
-        .then(function (response) {
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
             return response.json();
         })
-        .then(function (sessionId) {
-            return stripe.redirectToCheckout({ sessionId: sessionId.id });
+        .then(function(session) {
+            return stripe.redirectToCheckout({ sessionId: session.id });
         })
-        .then(function (result) {
+        .then(function(result) {
             if (result.error) {
                 alert(result.error.message);
             }
         })
-        .catch(function (error) {
+        .catch(function(error) {
             console.error('Error:', error);
+            alert('There was a problem with your payment. Please try again.');
+        })
+        .finally(function() {
+            checkoutButton.disabled = false;
+            checkoutButton.textContent = 'Checkout';
         });
     });
 </script>
 
- 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
-    const loadingScreen = document.getElementById('loading-screen');
+    const form = document.getElementById('submit-form');
+    const loadingScreen = document.querySelector('.loading-screen');
     const resultDiv = document.getElementById('result');
-
+    
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // First check reCAPTCHA
+        const recaptchaResponse = grecaptcha.getResponse();
+        console.log('reCAPTCHA response:', recaptchaResponse);
+        
+        if (!recaptchaResponse) {
+            alert('Please complete the CAPTCHA');
+            return;
+        }
+
+        // Show loading screen only after CAPTCHA is verified
         loadingScreen.style.display = 'flex';
         resultDiv.style.display = 'none';
 
         let formData = new FormData(form);
+        formData.append('g-recaptcha-response', recaptchaResponse);
         
-        // formData.append('g-recaptcha-response', grecaptcha.getResponse());
-    
+        // Log the FormData contents (for debugging)
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
 
         fetch('{{ url_for("submit") }}', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || 'Something went wrong');
+                });
+            }
+            return response.json();
+        })
         .then(data => {
-	    
-	    console.log("Recieved Data", data)	
+            loadingScreen.style.display = 'none';
             
-	    loadingScreen.style.display = 'none';
-            //grecaptcha.reset();
             if (data.error) {
-                console.log("data error",data.error  )
-		alert(data.error);
+                if (data.require_payment) {
+                    if (confirm('Your free trial has expired. Would you like to purchase unlimited access?')) {
+                        document.getElementById('checkout-button').click();
+                    }
+                } else if (data.require_login) {
+                    if (confirm('You've reached the maximum free uses. Would you like to sign in?')) {
+                        window.location.href = '{{ url_for("login") }}';
+                    }
+                } else {
+                    alert(data.error);
+                }
             } else {
-                // Update the page with the story and image
                 document.querySelector('#story').textContent = data.story;
                 document.querySelector('#image').src = data.image;
                 resultDiv.style.display = 'block';
@@ -144,10 +193,15 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             loadingScreen.style.display = 'none';
             console.error('Error:', error);
-            alert('An error occurred. Please try again.');
+            alert(error.message || 'An error occurred. Please try again.');
+        })
+        .finally(() => {
+            grecaptcha.reset();
         });
     });
 });
 </script>
- 
+
+
+
 {% endblock %}

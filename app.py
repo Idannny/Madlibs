@@ -11,22 +11,29 @@ import requests
 
 load_dotenv()  # Load environment variables from .env file
 
-# Use reCAPTCHA's test keys:
-# Google provides a set of test keys that you can use during developme
-# Site key: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
-# Secret key: 6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4Wif
-
 def create_app():
     app = Flask(__name__)
 
-    app.secret_key = os.getenv('SECRET_KEY')
-    app.stripekey = os.getenv('STRIPE_SECRET')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-   
+    # Determine environment from FLASK_ENV environment variable
+    is_development = os.getenv('FLASK_ENV', 'development') == 'development'
+
+    app.config.update(
+        SECRET_KEY=os.getenv('SECRET_KEY'),
+        STRIPE_KEY=os.getenv('STRIPE_SECRET'),
+        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL'),
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        
+        # Use appropriate reCAPTCHA keys based on environment
+        RECAPTCHA_SITE_KEY=os.getenv('RECAPTCHA_SITE_KEY_DEV' if is_development else 'RECAPTCHA_SITE_KEY_PROD'),
+        RECAPTCHA_SECRET=os.getenv('RECAPTCHA_SECRET_DEV' if is_development else 'RECAPTCHA_SECRET_PROD'),
+    )
 
     oauth = OAuth(app)
     db.init_app(app)
+
+    # Initialize database tables if they don't exist
+    with app.app_context():
+        db.create_all()
 
     google = oauth.register(
         name='google',
@@ -46,12 +53,11 @@ def create_app():
 
     client = OpenAI(api_key=api_key)
 
-    # Register routes and blueprints
-    with app.app_context():
-        db.create_all()
-
     def verify_recaptcha(recaptcha_response):
-        secret_key = os.getenv("RECAPTCHA_SECRET", "default_test_key")
+        if not recaptcha_response:
+            return False
+        
+        secret_key = os.getenv("RECAPTCHA_SECRET_DEV" if os.getenv('FLASK_ENV') == 'development' else "RECAPTCHA_SECRET_PROD")
         verify_url = "https://www.google.com/recaptcha/api/siteverify"
         data = {
             "secret": secret_key,
@@ -61,6 +67,7 @@ def create_app():
             response = requests.post(verify_url, data=data)
             response.raise_for_status()
             result = response.json()
+            app.logger.info(f"reCAPTCHA verification result: {result}")  # Add logging
             return result.get("success", False)
         except requests.RequestException as e:
             app.logger.error(f"ReCAPTCHA verification failed: {e}")
@@ -106,35 +113,118 @@ def create_app():
 
     @app.route('/')
     def index():
-        return render_template('index.html')
+        user_info = None
+        credits = 0
+        is_paid = False
+
+        if 'user' in session:
+            user = User.query.filter_by(email=session['user']['email']).first()
+            if user:
+                user_info = session['user']
+                is_paid = user.is_paid_user
+                if not is_paid:
+                    credits = 1 if not user.has_used_free_trial else 0
+        else:
+            # Anonymous user
+            credits = 3 - session.get('usage_count', 0)
+
+        return render_template('index.html', 
+                             user_info=user_info, 
+                             credits=credits,
+                             is_paid=is_paid)
+
+
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        if request.method == 'POST':
+            try:
+                name = request.form['name']
+                email = request.form['email']
+                password = request.form['password']
+                
+                # Check if user already exists
+                if User.query.filter_by(email=email).first():
+                    flash('Email address already registered')
+                    return redirect(url_for('register'))
+                
+                # Create new user with one free trial
+                user = User(
+                    name=name, 
+                    email=email, 
+                    has_used_free_trial=False,
+                    is_paid_user=False
+                )
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()
+                
+                # Log the user in
+                session['user'] = {'email': email, 'name': name}
+                flash('Registration successful! You have one free trial available.')
+                return redirect(url_for('index'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash('Registration failed. Please try again.')
+                app.logger.error(f"Registration error: {str(e)}")
+                return redirect(url_for('register'))
+                
+        return render_template('register.html')
+
+
 
     @app.route('/create-checkout-session', methods=['POST'])
     def create_checkout_session():
         try:
-            session = stripe.checkout.Session.create(
+            stripe.api_key = app.config['STRIPE_KEY']
+            
+            success_url = url_for('payment_success', _external=True)
+            cancel_url = url_for('payment_cancel', _external=True)
+
+            checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
                     'price_data': {
                         'currency': 'usd',
                         'product_data': {
-                            'name': 'Story Generation',
+                            'name': 'Unlimited Mad Libs Access',
+                            'description': 'Unlimited access to AI-generated Mad Libs stories',
                         },
-                        'unit_amount': 500,  # Make sure this is dynamically set if necessary
+                        'unit_amount': 500,  # $5.00
                     },
                     'quantity': 1,
                 }],
                 mode='payment',
-                success_url=url_for('success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-                cancel_url=url_for('index', _external=True),
+                success_url=success_url + '?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url=cancel_url,
+                client_reference_id=session.get('user', {}).get('email'),  # Link payment to user
             )
-            return jsonify({'id': session.id})
+            return jsonify({'id': checkout_session.id})
         except Exception as e:
+            app.logger.error(f"Stripe error: {str(e)}")
             return jsonify(error=str(e)), 403
 
-
-    @app.route('/success')
-    def success():
-        return render_template('success.html')
+    @app.route('/payment-success')
+    def payment_success():
+        session_id = request.args.get('session_id')
+        if session_id and 'user' in session:
+            try:
+                # Verify the payment with Stripe
+                stripe.api_key = app.config['STRIPE_KEY']
+                checkout_session = stripe.checkout.Session.retrieve(session_id)
+                
+                if checkout_session.payment_status == 'paid':
+                    # Update user status
+                    user = User.query.filter_by(email=session['user']['email']).first()
+                    if user:
+                        user.is_paid_user = True
+                        db.session.commit()
+                        flash('Thank you for your purchase! You now have unlimited access.')
+            except Exception as e:
+                app.logger.error(f"Payment verification error: {str(e)}")
+                flash('There was an error verifying your payment.')
+        
+        return redirect(url_for('index'))
 
     @app.route('/cancel')
     def cancel():
@@ -153,16 +243,43 @@ def create_app():
 
     @app.route('/submit', methods=['POST'])
     def submit():
-        # recaptcha_response = request.form.get('g-recaptcha-response')
-        # if not verify_recaptcha(recaptcha_response):
-        #     return jsonify({"error": "Please complete the CAPTCHA."}), 400
+        # First verify reCAPTCHA
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
+        
+        if not verify_recaptcha(recaptcha_response):
+            return jsonify({"error": "Please complete the CAPTCHA."}), 400
 
-        if 'user' not in session:
-
+        if 'user' in session:
+            # Logged in user
+            user = User.query.filter_by(email=session['user']['email']).first()
+            if user is None:
+                # User not found in database but exists in session
+                session.pop('user', None)  # Clear invalid session
+                return jsonify({
+                    "error": "User session expired. Please login again.",
+                    "require_login": True
+                }), 401
+            
+            if not user.is_paid_user:
+                if not user.has_used_free_trial:
+                    # First time use - mark trial as used
+                    user.has_used_free_trial = True
+                    db.session.commit()
+                else:
+                    return jsonify({
+                        "error": "Free trial used. Please purchase to continue.",
+                        "require_payment": True
+                    }), 403
+        else:
+            # Anonymous user
             if 'usage_count' not in session:
-                session['usage_count'] = 1
+                session['usage_count'] = 0
             if session['usage_count'] >= 3:
-                return jsonify({"error": "You have reached the maximum number of free uses."}), 403
+                return jsonify({
+                    "error": "You've reached the maximum free uses. Please sign in.",
+                    "require_login": True
+                }), 403
             session['usage_count'] += 1
 
         noun = request.form['noun']
