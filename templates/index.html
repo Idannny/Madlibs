@@ -1,29 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}Ad-Lib Game AI Generated :3 {% endblock %}
+{% block title %}Ad-Lib Game AI Generated{% endblock %}
 
 {% block content %}
+<div class="main-container">
+    <div class="header-section">
+        <h1>(M)Ad-Lib Game</h1>
+        <div class="auth-buttons">
+            {% if user_info %}
+                <span class="welcome-message">Welcome, {{ user_info.name }}!</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn-login">Login</a>
+                <a href="{{ url_for('register') }}" class="btn-register">Register</a>
+            {% endif %}
+        </div>
+    </div>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<h1>Ad-Lib Game with ChatGPT</h1>
-
-<div class="credits-info">
-    {% if is_paid %}
-        <p class="status-message">✨ You have unlimited access! ✨</p>
-    {% else %}
+    <div class="credits-info">
         {% if user_info %}
             {% if credits > 0 %}
-                <p class="status-message">You have {{ credits }} free trial remaining</p>
-            {% else %}
-                <p class="status-message">You've used your free trial. 
-                    <button onclick="document.getElementById('checkout-button').click()">
-                        Get Unlimited Access
-                    </button>
-                </p>
+                <p class="status-message">You have {{ credits }} credits remaining</p>
+            {% endif %}
+            {% if free_tries > 0 %}
+                <p class="status-message">You have {{ free_tries }} free tries remaining</p>
+            {% endif %}
+            {% if credits == 0 and free_tries == 0 %}
+                <p class="status-message">You don't have any credits or free tries. Purchase some to continue!</p>
             {% endif %}
         {% else %}
-            {% if credits > 0 %}
-                <p class="status-message">You have {{ credits }} free tries remaining. 
+            {% if free_tries > 0 %}
+                <p class="status-message">You have {{ free_tries }} free tries remaining. 
                     <a href="{{ url_for('login') }}">Sign in</a> for more!
                 </p>
             {% else %}
@@ -32,110 +39,135 @@
                 </p>
             {% endif %}
         {% endif %}
-    {% endif %}
-</div>
+    </div>
 
-<!-- Add this near the top of your body -->
-<div class="loading-screen" style="display: none;">
-    <div class="loading-content">
-        <img src="{{ url_for('static', filename='loading.gif') }}" alt="Loading...">
-        <p>Generating your story...</p>
+    <div class="game-section">
+        <div class="form-container">
+            <h2>Create Your Story</h2>
+            <form action="{{ url_for('submit') }}" method="post" id="submit-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="artstyle">Art Style</label>
+                        <select id="artstyle" name="artstyle" class="form-control">
+                            <option value="abstract">Abstract</option>
+                            <option value="realism">Realism</option>
+                            <option value="impressionism">Impressionism</option>
+                            <option value="cubism">Cubism</option>
+                            <option value="Cartoon">Cartoon</option>
+                            <option value="Gothic">Gothic</option>
+                            <option value="StickFigure">Stick Figure</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="noun">Noun</label>
+                        <input type="text" id="noun" name="noun" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="verb">Verb</label>
+                        <input type="text" id="verb" name="verb" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="adjective">Adjective</label>
+                        <input type="text" id="adjective" name="adjective" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="adverb">Adverb</label>
+                        <input type="text" id="adverb" name="adverb" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="number">Number</label>
+                        <input type="number" id="number" name="number" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bodypart">Body Part</label>
+                        <input type="text" id="bodypart" name="bodypart" class="form-control" required>
+                    </div>
+                </div>
+                
+                <div class="recaptcha-container">
+                    <div class="g-recaptcha" data-sitekey="{{ config['RECAPTCHA_SITE_KEY'] }}"></div>
+                </div>
+                
+                <button type="submit" class="btn-submit">Generate Story</button>
+            </form>
+        </div>
+
+        {% if user_info %}
+        <div class="purchase-credits">
+            <h2>Purchase Credits</h2>
+            <div class="credit-options">
+                <button onclick="purchaseCredits(1)" class="credit-option">1 Credit - $1</button>
+                <button onclick="purchaseCredits(5)" class="credit-option">5 Credits - $5</button>
+                <button onclick="purchaseCredits(10)" class="credit-option">10 Credits - $10</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="loading-screen" style="display: none;">
+        <div class="loading-content">
+            <img src="{{ url_for('static', filename='loading.gif') }}" alt="Loading...">
+            <p>Generating your story...</p>
+        </div>
+    </div>
+
+    <div id="result" class="result-container" style="display: none;">
+        <h2>Your Ad-Lib Story</h2>
+        <div class="story-content">
+            <p id="story"></p>
+            <img id="image" src="" alt="DALL-E Image">
+        </div>
     </div>
 </div>
 
-{% if error %}
-    <p class="error">{{ error }}</p>
-{% endif %}
-
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
-<form action="{{ url_for('submit') }}" method="post" id="submit-form">
-    <label for="artstyle">Image Art Style:</label>
-    <select id="artstyle" name="artstyle">
-        <option value="abstract">Abstract</option>
-        <option value="realism">Realism</option>
-        <option value="impressionism">Impressionism</option>
-        <option value="cubism">Cubism</option>
-        <option value="Cartoon">Cartoon</option>
-        <option value="Gothic">Gothic</option>
-        <option value="StickFigure">Stick Figure</option>
-        <!-- Add more options as needed -->
-    </select><br>
-
-    <label for="noun">Noun:</label>
-    <input type="text" id="noun" name="noun" required><br>
-
-    <label for="verb">Verb:</label>
-    <input type="text" id="verb" name="verb" required><br>
-
-    <label for="adjective">Adjective:</label>
-    <input type="text" id="adjective" name="adjective" required><br>
-
-    <label for="adverb">Adverb:</label>
-    <input type="text" id="adverb" name="adverb" required><br>
-
-    <label for="number">Number:</label>
-    <input type="number" id="number" name="number" required><br>
-
-    <label for="bodypart">Body Part:</label>
-    <input type="text" id="bodypart" name="bodypart" required><br>
-    
-    <div class="g-recaptcha" data-sitekey="{{ config['RECAPTCHA_SITE_KEY'] }}"></div>
-    
-    <button type="submit" class="btn-submit">Submit</button>
-</form>
-
-<div id="result" style="display: none;">
-    <h2>Your Ad-Lib Story:</h2>
-    <p id="story"></p>
-    <img id="image" src="" alt="DALL-E Image">
-</div>
-
-
-<form action="/create-checkout-session" method="POST">
-    <button type="submit" id="checkout-button">Checkout</button>
-</form>
-
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-    var stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
-    var checkoutButton = document.getElementById('checkout-button');
+    const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
+    
+    async function purchaseCredits(credits) {
+        try {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Processing...';
 
-    checkoutButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        
-        checkoutButton.disabled = true;
-        checkoutButton.textContent = 'Processing...';
+            const response = await fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ credits: credits })
+            });
 
-        fetch('/create-checkout-session', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(function(response) {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
-            return response.json();
-        })
-        .then(function(session) {
-            return stripe.redirectToCheckout({ sessionId: session.id });
-        })
-        .then(function(result) {
+
+            const session = await response.json();
+            
+            const result = await stripe.redirectToCheckout({
+                sessionId: session.id
+            });
+
             if (result.error) {
-                alert(result.error.message);
+                throw new Error(result.error.message);
             }
-        })
-        .catch(function(error) {
+        } catch (error) {
             console.error('Error:', error);
             alert('There was a problem with your payment. Please try again.');
-        })
-        .finally(function() {
-            checkoutButton.disabled = false;
-            checkoutButton.textContent = 'Checkout';
-        });
-    });
+            
+            const button = event.target;
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
 </script>
 
 <script>
@@ -145,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     
     form.addEventListener('submit', function(e) {
-        e.preventDefault();  // Prevent form from submitting normally
+        e.preventDefault();
         
         const recaptchaResponse = grecaptcha.getResponse();
         if (!recaptchaResponse) {
@@ -169,14 +201,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (data.error) {
                 alert(data.error);
+                if (data.require_login) {
+                    window.location.href = '{{ url_for("login") }}';
+                } else if (data.require_payment) {
+                    const purchaseSection = document.querySelector('.purchase-credits');
+                    if (purchaseSection) {
+                        purchaseSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
             } else {
-                // Update the result elements
                 document.getElementById('story').textContent = data.story;
                 document.getElementById('image').src = data.image;
-                // Show the result div
                 resultDiv.style.display = 'block';
-                
-                // Scroll to the result
                 resultDiv.scrollIntoView({ behavior: 'smooth' });
             }
         })
@@ -191,7 +227,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-
-
 {% endblock %}

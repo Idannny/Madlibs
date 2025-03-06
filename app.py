@@ -1,13 +1,17 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import stripe
 from authlib.integrations.flask_client import OAuth
 from flask_sqlalchemy import SQLAlchemy
-from extensions import db
+from extensions import db, migrate
 from models import User  
 import requests
+from flask_mail import Mail, Message
+import logging
+from datetime import datetime, timedelta
+import secrets
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -20,6 +24,7 @@ def create_app():
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY'),
         STRIPE_KEY=os.getenv('STRIPE_SECRET'),
+        STRIPE_PUBLISHABLE_KEY=os.getenv('STRIPE_PUBLISHABLE_KEY'),
         SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL'),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         
@@ -30,6 +35,7 @@ def create_app():
 
     oauth = OAuth(app)
     db.init_app(app)
+    migrate.init_app(app, db)
 
     # Initialize database tables if they don't exist
     with app.app_context():
@@ -53,6 +59,9 @@ def create_app():
 
     client = OpenAI(api_key=api_key)
 
+    # Initialize Flask-Mail
+    mail = Mail(app)
+
     def verify_recaptcha(recaptcha_response):
         if not recaptcha_response:
             return False
@@ -73,22 +82,52 @@ def create_app():
             app.logger.error(f"ReCAPTCHA verification failed: {e}")
             return False
 
+    def send_verification_email(user):
+        token = user.generate_verification_token()
+        db.session.commit()
+        
+        verification_url = url_for('verify_email', token=token, _external=True)
+        
+        msg = Message('Verify Your Email',
+                      sender=os.getenv('MAIL_USERNAME'),
+                      recipients=[user.email])
+        msg.body = f'''Please click the following link to verify your email:
+{verification_url}
 
-    @app.route('/login')
+This link will expire in 24 hours.
+
+If you did not create an account, please ignore this email.
+'''
+        mail.send(msg)
+
+    @app.route('/login', methods=['GET', 'POST'])
     def login():
-        return google.authorize_redirect(url_for('authorized', _external=True))
+        if request.method == 'POST':
+            email = request.form.get('email')
+            password = request.form.get('password')
+            user = User.query.filter_by(email=email).first()
+            
+            if user and user.check_password(password):
+                if not user.is_email_verified:
+                    flash('Please verify your email before logging in.')
+                    return redirect(url_for('login'))
+                
+                session['user'] = {
+                    'id': user.id,
+                    'name': user.name,
+                    'email': user.email
+                }
+                return redirect(url_for('index'))
+            
+            flash('Invalid email or password.')
+            return redirect(url_for('login'))
+        
+        return render_template('login.html')
 
-    @app.route('/logout')
-    def logout():
-        session.pop('user', None)
-        return redirect(url_for('index'))
-
-
-    @app.before_request
-    def load_google_token():
-        token = session.get("google_token")
-        if token:
-            google.token = token
+    @app.route('/google-login')
+    def google_login():
+        redirect_uri = url_for('authorized', _external=True)
+        return google.authorize_redirect(redirect_uri)
 
     @app.route('/callback')
     def authorized():
@@ -96,87 +135,129 @@ def create_app():
         if not token:
             return 'Access denied.'
         
-        # Save the token in the session
         session['google_token'] = token
-
         user_info = google.get('userinfo').json()
 
         user = User.query.filter_by(email=user_info['email']).first()
         if user is None:
-            new_user = User(email=user_info['email'], name=user_info.get('name'))
+            # Create new user with Google OAuth
+            new_user = User(
+                email=user_info['email'],
+                name=user_info.get('name'),
+                is_oauth_user=True,
+                free_tries_left=3,  # Initialize with 3 free tries
+                credits=0
+            )
             db.session.add(new_user)
             db.session.commit()
             user = new_user
 
         session['user'] = user_info
-        return redirect(url_for('profile'))
+        return redirect(url_for('index'))
+
+    @app.route('/logout')
+    def logout():
+        session.pop('user', None)
+        session.pop('google_token', None)
+        return redirect(url_for('index'))
+
+    @app.before_request
+    def load_google_token():
+        token = session.get("google_token")
+        if token:
+            google.token = token
 
     @app.route('/')
     def index():
         user_info = None
         credits = 0
-        is_paid = False
+        free_tries = 0
 
         if 'user' in session:
             user = User.query.filter_by(email=session['user']['email']).first()
             if user:
                 user_info = session['user']
-                is_paid = user.is_paid_user
-                if not is_paid:
-                    credits = 1 if not user.has_used_free_trial else 0
+                credits = user.credits
+                free_tries = user.free_tries_left
         else:
             # Anonymous user
-            credits = 3 - session.get('usage_count', 0)
+            free_tries = 3 - session.get('usage_count', 0)
 
         return render_template('index.html', 
                              user_info=user_info, 
                              credits=credits,
-                             is_paid=is_paid)
-
+                             free_tries=free_tries)
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
-            try:
-                name = request.form['name']
-                email = request.form['email']
-                password = request.form['password']
-                
-                # Check if user already exists
-                if User.query.filter_by(email=email).first():
-                    flash('Email address already registered')
-                    return redirect(url_for('register'))
-                
-                # Create new user with one free trial
-                user = User(
-                    name=name, 
-                    email=email, 
-                    has_used_free_trial=False,
-                    is_paid_user=False
-                )
-                user.set_password(password)
-                db.session.add(user)
-                db.session.commit()
-                
-                # Log the user in
-                session['user'] = {'email': email, 'name': name}
-                flash('Registration successful! You have one free trial available.')
-                return redirect(url_for('index'))
-                
-            except Exception as e:
-                db.session.rollback()
-                flash('Registration failed. Please try again.')
-                app.logger.error(f"Registration error: {str(e)}")
+            name = request.form.get('name')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            
+            if User.query.filter_by(email=email).first():
+                flash('Email already registered. Please login or use a different email.')
                 return redirect(url_for('register'))
-                
+            
+            user = User(name=name, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            
+            # Send verification email
+            send_verification_email(user)
+            
+            flash('Registration successful! Please check your email to verify your account.')
+            return redirect(url_for('login'))
+        
         return render_template('register.html')
 
+    @app.route('/verify-email/<token>')
+    def verify_email(token):
+        user = User.query.filter_by(email_verification_token=token).first()
+        
+        if not user:
+            flash('Invalid or expired verification link.')
+            return redirect(url_for('login'))
+        
+        if user.verify_email(token):
+            db.session.commit()
+            flash('Email verified successfully! You can now log in.')
+            return redirect(url_for('login'))
+        
+        flash('Verification link has expired. Please request a new one.')
+        return redirect(url_for('login'))
 
+    @app.route('/resend-verification', methods=['POST'])
+    def resend_verification():
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            flash('Email not found.')
+            return redirect(url_for('login'))
+        
+        if user.is_email_verified:
+            flash('Email is already verified.')
+            return redirect(url_for('login'))
+        
+        send_verification_email(user)
+        flash('Verification email has been resent. Please check your inbox.')
+        return redirect(url_for('login'))
 
     @app.route('/create-checkout-session', methods=['POST'])
     def create_checkout_session():
+        if 'user' not in session:
+            return jsonify({"error": "Please log in to purchase credits"}), 401
+
         try:
             stripe.api_key = app.config['STRIPE_KEY']
+            
+            # Get the number of credits to purchase from the request
+            credits = int(request.json.get('credits', 1))
+            
+            # Calculate the total amount (1 credit = $1)
+            amount = credits * 100  # Convert to cents
             
             success_url = url_for('payment_success', _external=True)
             cancel_url = url_for('payment_cancel', _external=True)
@@ -187,17 +268,21 @@ def create_app():
                     'price_data': {
                         'currency': 'usd',
                         'product_data': {
-                            'name': 'Unlimited Mad Libs Access',
-                            'description': 'Unlimited access to AI-generated Mad Libs stories',
+                            'name': f'{credits} Mad Libs Credits',
+                            'description': f'Purchase {credits} credits for AI-generated Mad Libs stories',
                         },
-                        'unit_amount': 500,  # $5.00
+                        'unit_amount': 100,  # $1.00 per credit
                     },
-                    'quantity': 1,
+                    'quantity': credits,
                 }],
                 mode='payment',
                 success_url=success_url + '?session_id={CHECKOUT_SESSION_ID}',
                 cancel_url=cancel_url,
-                client_reference_id=session.get('user', {}).get('email'),  # Link payment to user
+                client_reference_id=session['user']['email'],  # Link payment to user
+                metadata={
+                    'credits': credits,
+                    'user_email': session['user']['email']
+                }
             )
             return jsonify({'id': checkout_session.id})
         except Exception as e:
@@ -207,28 +292,38 @@ def create_app():
     @app.route('/payment-success')
     def payment_success():
         session_id = request.args.get('session_id')
-        if session_id and 'user' in session:
-            try:
-                # Verify the payment with Stripe
-                stripe.api_key = app.config['STRIPE_KEY']
-                checkout_session = stripe.checkout.Session.retrieve(session_id)
+        if not session_id or 'user' not in session:
+            flash('Invalid payment session')
+            return redirect(url_for('index'))
+
+        try:
+            # Verify the payment with Stripe
+            stripe.api_key = app.config['STRIPE_KEY']
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            
+            if checkout_session.payment_status == 'paid':
+                # Get the number of credits from metadata
+                credits = int(checkout_session.metadata.get('credits', 1))
                 
-                if checkout_session.payment_status == 'paid':
-                    # Update user status
-                    user = User.query.filter_by(email=session['user']['email']).first()
-                    if user:
-                        user.is_paid_user = True
-                        db.session.commit()
-                        flash('Thank you for your purchase! You now have unlimited access.')
-            except Exception as e:
-                app.logger.error(f"Payment verification error: {str(e)}")
-                flash('There was an error verifying your payment.')
+                # Update user credits
+                user = User.query.filter_by(email=session['user']['email']).first()
+                if user:
+                    user.add_credits(credits)
+                    flash(f'Thank you for your purchase! {credits} credits have been added to your account.')
+                else:
+                    flash('Error: User not found')
+            else:
+                flash('Payment was not successful')
+        except Exception as e:
+            app.logger.error(f"Payment verification error: {str(e)}")
+            flash('There was an error verifying your payment.')
         
         return redirect(url_for('index'))
 
-    @app.route('/cancel')
-    def cancel():
-        return render_template('cancel.html')
+    @app.route('/payment-cancel')
+    def payment_cancel():
+        flash('Payment was cancelled')
+        return redirect(url_for('index'))
 
     @app.route('/profile')
     def profile():
@@ -243,7 +338,6 @@ def create_app():
 
     @app.route('/submit', methods=['POST'])
     def submit():
-        # First verify reCAPTCHA
         recaptcha_response = request.form.get('g-recaptcha-response')
         app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
         
@@ -254,21 +348,17 @@ def create_app():
             # Logged in user
             user = User.query.filter_by(email=session['user']['email']).first()
             if user is None:
-                # User not found in database but exists in session
-                session.pop('user', None)  # Clear invalid session
+                session.pop('user', None)
                 return jsonify({
                     "error": "User session expired. Please login again.",
                     "require_login": True
                 }), 401
             
-            if not user.is_paid_user:
-                if not user.has_used_free_trial:
-                    # First time use - mark trial as used
-                    user.has_used_free_trial = True
-                    db.session.commit()
-                else:
+            # Try to use a credit first, then fall back to free tries
+            if not user.use_credit():
+                if not user.use_free_try():
                     return jsonify({
-                        "error": "Free trial used. Please purchase to continue.",
+                        "error": "You've used all your free tries. Please purchase credits to continue.",
                         "require_payment": True
                     }), 403
         else:
@@ -294,7 +384,7 @@ def create_app():
 
         try:
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",  # Specify the model
+                model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=150,
                 stop=None
