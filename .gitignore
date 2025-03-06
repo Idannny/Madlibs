@@ -6,3 +6,5 @@ venv/
 .vscode/
 
 .env
+
+reset_db.py
