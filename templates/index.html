@@ -7,6 +7,34 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <h1>Ad-Lib Game with ChatGPT</h1>
 
+<div class="credits-info">
+    {% if is_paid %}
+        <p class="status-message">✨ You have unlimited access! ✨</p>
+    {% else %}
+        {% if user_info %}
+            {% if credits > 0 %}
+                <p class="status-message">You have {{ credits }} free trial remaining</p>
+            {% else %}
+                <p class="status-message">You've used your free trial. 
+                    <button onclick="document.getElementById('checkout-button').click()">
+                        Get Unlimited Access
+                    </button>
+                </p>
+            {% endif %}
+        {% else %}
+            {% if credits > 0 %}
+                <p class="status-message">You have {{ credits }} free tries remaining. 
+                    <a href="{{ url_for('login') }}">Sign in</a> for more!
+                </p>
+            {% else %}
+                <p class="status-message">You've used all free tries. 
+                    <a href="{{ url_for('login') }}">Sign in</a> to continue!
+                </p>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</div>
+
 <!-- Add this near the top of your body -->
 <div class="loading-screen" style="display: none;">
     <div class="loading-content">
@@ -14,14 +42,6 @@
         <p>Generating your story...</p>
     </div>
 </div>
-
-{% if 'user' not in session %}
-    {% if session.get('usage_count', 0) < 3 %}
-        <p>You have {{ 3 - session.get('usage_count', 0) }} free tries remaining. Sign in for unlimited use.</p>
-    {% else %}
-        <p>You have used all your free tries. Please <a href="{{ url_for('login') }}">sign in</a> to continue.</p>
-    {% endif %}
-{% endif %}
 
 {% if error %}
     <p class="error">{{ error }}</p>
@@ -71,15 +91,6 @@
     <img id="image" src="" alt="DALL-E Image">
 </div>
 
-
-{% if story %}
-    <h2>Your Ad-Lib Story:</h2>
-    <p>{{ story }}</p>
-{% endif %}
-
-{% if image %}
-    <img src="{{ image }}" alt="DALL-E Image">
-{% endif %}
 
 <form action="/create-checkout-session" method="POST">
     <button type="submit" id="checkout-button">Checkout</button>
@@ -134,66 +145,45 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     
     form.addEventListener('submit', function(e) {
-        e.preventDefault();
+        e.preventDefault();  // Prevent form from submitting normally
         
-        // First check reCAPTCHA
         const recaptchaResponse = grecaptcha.getResponse();
-        console.log('reCAPTCHA response:', recaptchaResponse);
-        
         if (!recaptchaResponse) {
             alert('Please complete the CAPTCHA');
             return;
         }
 
-        // Show loading screen only after CAPTCHA is verified
         loadingScreen.style.display = 'flex';
         resultDiv.style.display = 'none';
 
         let formData = new FormData(form);
         formData.append('g-recaptcha-response', recaptchaResponse);
         
-        // Log the FormData contents (for debugging)
-        for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
-
         fetch('{{ url_for("submit") }}', {
             method: 'POST',
             body: formData
         })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.error || 'Something went wrong');
-                });
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             loadingScreen.style.display = 'none';
             
             if (data.error) {
-                if (data.require_payment) {
-                    if (confirm('Your free trial has expired. Would you like to purchase unlimited access?')) {
-                        document.getElementById('checkout-button').click();
-                    }
-                } else if (data.require_login) {
-                    if (confirm('You've reached the maximum free uses. Would you like to sign in?')) {
-                        window.location.href = '{{ url_for("login") }}';
-                    }
-                } else {
-                    alert(data.error);
-                }
+                alert(data.error);
             } else {
-                document.querySelector('#story').textContent = data.story;
-                document.querySelector('#image').src = data.image;
+                // Update the result elements
+                document.getElementById('story').textContent = data.story;
+                document.getElementById('image').src = data.image;
+                // Show the result div
                 resultDiv.style.display = 'block';
+                
+                // Scroll to the result
+                resultDiv.scrollIntoView({ behavior: 'smooth' });
             }
         })
         .catch(error => {
             loadingScreen.style.display = 'none';
             console.error('Error:', error);
-            alert(error.message || 'An error occurred. Please try again.');
+            alert('An error occurred. Please try again.');
         })
         .finally(() => {
             grecaptcha.reset();
