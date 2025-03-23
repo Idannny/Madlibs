@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Story Details{% endblock %}
+
+{% block content %}
+<div class="story-container">
+    <div class="story-header">
+        <h1>Your Story</h1>
+        <div class="story-meta">
+            <p>Created on: {{ story.created_at.strftime('%B %d, %Y') }}</p>
+        </div>
+    </div>
+
+    <div class="story-content">
+        <div class="story-image">
+            <img src="{{ story.image_url }}" alt="Story illustration" class="generated-image">
+        </div>
+        
+        <div class="story-text">
+            <p>{{ story.content }}</p>
+        </div>
+
+        <div class="story-inputs">
+            <h3>Story Inputs</h3>
+            <ul>
+                <li><strong>Noun:</strong> {{ story.noun }}</li>
+                <li><strong>Verb:</strong> {{ story.verb }}</li>
+                <li><strong>Adjective:</strong> {{ story.adjective }}</li>
+                <li><strong>Adverb:</strong> {{ story.adverb }}</li>
+                <li><strong>Number:</strong> {{ story.number }}</li>
+                <li><strong>Body Part:</strong> {{ story.bodypart }}</li>
+                <li><strong>Art Style:</strong> {{ story.artstyle }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="story-actions">
+        <a href="{{ url_for('profile') }}" class="btn btn-secondary">Back to Profile</a>
+        <button class="btn btn-primary" onclick="shareStory()">Share Story</button>
+    </div>
+</div>
+
+<script>
+function shareStory() {
+    // Create a temporary textarea to hold the story content
+    const textArea = document.createElement('textarea');
+    const storyContent = `Check out my AI-generated Mad Lib story!\n\n${document.querySelector('.story-text p').textContent}\n\nCreate your own at [Your Website URL]`;
+    
+    textArea.value = storyContent;
+    document.body.appendChild(textArea);
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        alert('Story copied to clipboard! You can now share it with others.');
+    } catch (err) {
+        console.error('Failed to copy story:', err);
+        alert('Failed to copy story to clipboard.');
+    } finally {
+        document.body.removeChild(textArea);
+    }
+}
+</script>
+{% endblock %} 

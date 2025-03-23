@@ -5,20 +5,38 @@ import os
 import stripe
 from authlib.integrations.flask_client import OAuth
 from flask_sqlalchemy import SQLAlchemy
-from extensions import db, migrate
-from models import User  
+from extensions import db, migrate, limiter
+from models import User, Story  
 import requests
 from flask_mail import Mail, Message
 import logging
 from datetime import datetime, timedelta
 import secrets
+from flask_wtf.csrf import CSRFProtect
+from flask_talisman import Talisman
 
 load_dotenv()  # Load environment variables from .env file
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
-
-    # Determine environment from FLASK_ENV environment variable
+    csrf.init_app(app)
+    
+    Talisman(app, content_security_policy={
+        'default-src': "'self'",
+        'script-src': [
+            "'self'",
+            'https://www.google.com/recaptcha/',
+            'https://www.gstatic.com/recaptcha/',
+            'https://js.stripe.com',
+        ],
+        'frame-src': [
+            'https://www.google.com/recaptcha/',
+            'https://js.stripe.com',
+        ],
+        'style-src': ["'self'", "'unsafe-inline'"],
+    })
+    
     is_development = os.getenv('FLASK_ENV', 'development') == 'development'
 
     app.config.update(
@@ -36,6 +54,7 @@ def create_app():
     oauth = OAuth(app)
     db.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
 
     # Initialize database tables if they don't exist
     with app.app_context():
@@ -92,15 +111,51 @@ def create_app():
                       sender=os.getenv('MAIL_USERNAME'),
                       recipients=[user.email])
         msg.body = f'''Please click the following link to verify your email:
-{verification_url}
+                    {verification_url}
 
-This link will expire in 24 hours.
+                    This link will expire in 24 hours.
 
-If you did not create an account, please ignore this email.
-'''
+                    If you did not create an account, please ignore this email.
+                    '''
         mail.send(msg)
 
+
+    def sanitize_input(text):
+    # Remove any HTML tags or dangerous characters
+        return bleach.clean(text, tags=[], strip=True)
+
+    @app.route('/')
+    def landing():
+        user_info = None
+        if 'user' in session:
+            user = User.query.filter_by(email=session['user']['email']).first()
+            if user:
+                user_info = session['user']
+        return render_template('landing.html', user_info=user_info)
+
+    @app.route('/app')
+    def index():
+        user_info = None
+        credits = 0
+        free_tries = 0
+
+        if 'user' in session:
+            user = User.query.filter_by(email=session['user']['email']).first()
+            if user:
+                user_info = session['user']
+                credits = user.credits
+                free_tries = user.free_tries_left
+        else:
+            # Anonymous user
+            free_tries = 3 - session.get('usage_count', 0)
+
+        return render_template('index.html', 
+                             user_info=user_info, 
+                             credits=credits,
+                             free_tries=free_tries)
+
     @app.route('/login', methods=['GET', 'POST'])
+    @limiter.limit("10 per hour")  # Limit login attempts
     def login():
         if request.method == 'POST':
             email = request.form.get('email')
@@ -167,28 +222,8 @@ If you did not create an account, please ignore this email.
         if token:
             google.token = token
 
-    @app.route('/')
-    def index():
-        user_info = None
-        credits = 0
-        free_tries = 0
-
-        if 'user' in session:
-            user = User.query.filter_by(email=session['user']['email']).first()
-            if user:
-                user_info = session['user']
-                credits = user.credits
-                free_tries = user.free_tries_left
-        else:
-            # Anonymous user
-            free_tries = 3 - session.get('usage_count', 0)
-
-        return render_template('index.html', 
-                             user_info=user_info, 
-                             credits=credits,
-                             free_tries=free_tries)
-
     @app.route('/register', methods=['GET', 'POST'])
+    @limiter.limit("5 per hour")  # Limit registration attempts
     def register():
         if request.method == 'POST':
             name = request.form.get('name')
@@ -245,7 +280,129 @@ If you did not create an account, please ignore this email.
         flash('Verification email has been resent. Please check your inbox.')
         return redirect(url_for('login'))
 
+    @app.route('/profile')
+    def profile():
+        if 'user' not in session:
+            return redirect(url_for('login'))
+
+        user = User.query.filter_by(email=session['user']['email']).first()
+        if not user:
+            session.pop('user', None)
+            return redirect(url_for('login'))
+
+        stories = Story.query.filter_by(user_id=user.id).order_by(Story.created_at.desc()).all()
+        
+        return render_template('profile.html',
+                             user=session['user'],
+                             credits=user.credits,
+                             free_tries=user.free_tries_left,
+                             stories=stories,
+                             stripe_key=app.config['STRIPE_PUBLISHABLE_KEY'])
+
+    @app.route('/submit', methods=['POST'])
+    @limiter.limit("30 per hour")  # Limit story generation
+    def submit():
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
+        
+        if not verify_recaptcha(recaptcha_response):
+            return jsonify({"error": "Please complete the CAPTCHA."}), 400
+
+        if 'user' in session:
+            # Logged in user
+            user = User.query.filter_by(email=session['user']['email']).first()
+            if user is None:
+                session.pop('user', None)
+                return jsonify({
+                    "error": "User session expired. Please login again.",
+                    "require_login": True
+                }), 401
+            
+            # Try to use a credit first, then fall back to free tries
+            if not user.use_credit():
+                if not user.use_free_try():
+                    return jsonify({
+                        "error": "You've used all your free tries. Please purchase credits to continue.",
+                        "require_payment": True
+                    }), 403
+        else:
+            # Anonymous user
+            if 'usage_count' not in session:
+                session['usage_count'] = 0
+            if session['usage_count'] >= 3:
+                return jsonify({
+                    "error": "You've reached the maximum free uses. Please sign in.",
+                    "require_login": True
+                }), 403
+            session['usage_count'] += 1
+
+        noun = sanitize_input(request.form['noun'])
+        verb = sanitize_input(request.form['verb'])
+        adjective = sanitize_input(request.form['adjective'])
+        adverb = sanitize_input(request.form['adverb'])
+        number = sanitize_input(request.form['number'])
+        bodypart = sanitize_input(request.form['bodypart'])
+        artstyle = sanitize_input(request.form['artstyle'])
+
+        prompt = f"Create a short 100 word story with bodypart - {bodypart} adjective - {adjective} noun - {noun} verb - {verb} adverb - {adverb} number - {number} integrated in the story."
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150,
+                stop=None
+            )
+            story_content = response.choices[0].message.content.strip()
+
+            imagePrompt = f"Based off the {artstyle} artstyle, illustrate this story: '{story_content}' ... "
+
+            D3response = client.images.generate(
+                model="dall-e-3",
+                prompt=imagePrompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+
+            image_url = D3response.data[0].url
+
+            # Save the story if user is logged in
+            if 'user' in session and user:
+                story = Story(
+                    content=story_content,
+                    image_url=image_url,
+                    user_id=user.id,
+                    noun=noun,
+                    verb=verb,
+                    adjective=adjective,
+                    adverb=adverb,
+                    number=int(number),
+                    bodypart=bodypart,
+                    artstyle=artstyle
+                )
+                db.session.add(story)
+                db.session.commit()
+
+            return jsonify({"story": story_content, "image": image_url})
+
+        except Exception as e:
+            app.logger.error(f"Error generating story: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route('/story/<int:story_id>')
+    def view_story(story_id):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+
+        story = Story.query.get_or_404(story_id)
+        if story.user_id != User.query.filter_by(email=session['user']['email']).first().id:
+            abort(403)  # Forbidden
+
+        return render_template('story.html', story=story)
+
     @app.route('/create-checkout-session', methods=['POST'])
+    @limiter.limit("10 per hour") 
     def create_checkout_session():
         if 'user' not in session:
             return jsonify({"error": "Please log in to purchase credits"}), 401
@@ -318,97 +475,12 @@ If you did not create an account, please ignore this email.
             app.logger.error(f"Payment verification error: {str(e)}")
             flash('There was an error verifying your payment.')
         
-        return redirect(url_for('index'))
+        return redirect(url_for('profile'))
 
     @app.route('/payment-cancel')
     def payment_cancel():
         flash('Payment was cancelled')
-        return redirect(url_for('index'))
-
-    @app.route('/profile')
-    def profile():
-        user_info = session.get('user')
-        if not user_info:
-            return redirect(url_for('index'))
-
-        user = User.query.filter_by(email=user_info['email']).first()
-        balance = user.balance if user else 0
-
-        return render_template('profile.html', user=user_info, balance=balance)
-
-    @app.route('/submit', methods=['POST'])
-    def submit():
-        recaptcha_response = request.form.get('g-recaptcha-response')
-        app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
-        
-        if not verify_recaptcha(recaptcha_response):
-            return jsonify({"error": "Please complete the CAPTCHA."}), 400
-
-        if 'user' in session:
-            # Logged in user
-            user = User.query.filter_by(email=session['user']['email']).first()
-            if user is None:
-                session.pop('user', None)
-                return jsonify({
-                    "error": "User session expired. Please login again.",
-                    "require_login": True
-                }), 401
-            
-            # Try to use a credit first, then fall back to free tries
-            if not user.use_credit():
-                if not user.use_free_try():
-                    return jsonify({
-                        "error": "You've used all your free tries. Please purchase credits to continue.",
-                        "require_payment": True
-                    }), 403
-        else:
-            # Anonymous user
-            if 'usage_count' not in session:
-                session['usage_count'] = 0
-            if session['usage_count'] >= 3:
-                return jsonify({
-                    "error": "You've reached the maximum free uses. Please sign in.",
-                    "require_login": True
-                }), 403
-            session['usage_count'] += 1
-
-        noun = request.form['noun']
-        verb = request.form['verb']
-        adjective = request.form['adjective']
-        adverb = request.form['adverb']
-        number = request.form['number']
-        bodypart = request.form['bodypart']
-        artstyle = request.form['artstyle']
-
-        prompt = f"Create a short 100 word story with bodypart - {bodypart} adjective - {adjective} noun - {noun} verb - {verb} adverb - {adverb} number - {number} integrated in the story."
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                stop=None
-            )
-            story = response.choices[0].message.content.strip()
-
-            imagePrompt = f"Based off the {artstyle} artstyle, illustrate this story: '{story}' ... "
-
-            D3response = client.images.generate(
-                model="dall-e-3",
-                prompt=imagePrompt,
-                size="1024x1024",
-                quality="standard",
-                n=1,
-            )
-
-            image_url = D3response.data[0].url
-            print("||Story ", story, "||")
-            print(image_url)
-
-            return jsonify({"story": story, "image": image_url})
-
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        return redirect(url_for('profile'))
 
     return app
 

@@ -51,13 +51,15 @@
                 </div>
                 <nav class="nav">
                     <ul>
-                        <li><a href="{{ url_for('index') }}">Purchase Tokens</a></li>
+                        <li><a  href="{{ url_for('index') }}#end">Purchase Tokens</a></li>
 
                         {% if session.get('user') %}
                             <li><a href="{{ url_for('profile') }}">Profile</a></li>
                             <li><a href="{{ url_for('logout') }}" class="btn-sign-out">Sign Out</a></li>
                         {% else %}
-                            <li><a href="{{ url_for('login') }}" class="btn-sign-in">Sign In with Google</a></li>
+                            <li><a href="{{ url_for('google_login') }}"  class="btn-sign-in">Sign In with Google</a></li>
+      
+
                            
                         {% endif %}
                     </ul>
@@ -120,6 +122,8 @@
         });
     </script> -->
 
+    <div id="end">
 
+    </div>  
 </body>
 </html>

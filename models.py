@@ -15,6 +15,7 @@ class User(db.Model):
     email_verification_token = db.Column(db.String(100), unique=True)
     email_verification_expires = db.Column(db.DateTime)
     is_oauth_user = db.Column(db.Boolean, default=False)
+    stories = db.relationship('Story', backref='user', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -59,3 +60,22 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User {self.email}>'
+
+class Story(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Story inputs
+    noun = db.Column(db.String(100))
+    verb = db.Column(db.String(100))
+    adjective = db.Column(db.String(100))
+    adverb = db.Column(db.String(100))
+    number = db.Column(db.Integer)
+    bodypart = db.Column(db.String(100))
+    artstyle = db.Column(db.String(100))
+
+    def __repr__(self):
+        return f'<Story {self.id}>'
