@@ -45,7 +45,7 @@
         <div class="form-container">
             <h2>Create Your Story</h2>
             <form action="{{ url_for('submit') }}" method="post" id="submit-form">
-                {{ csrf_token() }}
+                <!--{{ csrf_token() }}-->
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="artstyle">Art Style</label>
@@ -129,7 +129,10 @@
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <script src="https://js.stripe.com/v3/"></script>
-<script>
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/base.js') }}"></script>
+
+<!-- <script>
     const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
     
     async function purchaseCredits(credits) {
@@ -169,9 +172,9 @@
             button.textContent = originalText;
         }
     }
-</script>
+</script> -->
 
-<script>
+<!-- <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
     const loadingScreen = document.querySelector('.loading-screen');
@@ -227,5 +230,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-</script>
+</script> -->
 {% endblock %}

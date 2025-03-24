@@ -6,22 +6,10 @@
     <title>{% block title %}Madness{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <style>
-        .btn-sign-in, .btn-sign-out {
-            background-color: #4285F4; /* Google Blue */
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            border-radius: 4px;
-            transition-duration: 0.3s;
-        }
 
-        .btn-sign-in:hover, .btn-sign-out:hover {
-            background-color: #357AE8; /* Darker Blue */
-        }
+    <!-- <script src="{{ url_for('static', filename='js/base.js') }}"></script> -->
+
+    <!-- <style>
 
         /* Loading Screen Styles */
         .loading-screen {
@@ -38,7 +26,7 @@
             color: white;
             font-size: 24px;
         }
-    </style>
+    </style> -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
@@ -123,7 +111,8 @@
     </script> -->
 
     <div id="end">
-
     </div>  
+    <!-- <script src="{{ url_for('static', filename='js/base.js') }}"></script> -->
+
 </body>
 </html>

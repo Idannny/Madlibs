@@ -75,9 +75,10 @@
         </div>
     </div>
 </div>
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 
 <script src="https://js.stripe.com/v3/"></script>
-<script>
+<!-- <script>
     const stripe = Stripe('{{ stripe_key }}');
     
     async function purchaseCredits(credits) {
@@ -121,5 +122,5 @@
     function viewStory(storyId) {
         window.location.href = `/story/${storyId}`;
     }
-</script>
+</script> -->
 {% endblock %}

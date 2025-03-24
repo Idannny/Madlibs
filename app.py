@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import secrets
 from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
+import bleach
 
 load_dotenv()  # Load environment variables from .env file
 csrf = CSRFProtect()
@@ -34,7 +35,7 @@ def create_app():
             'https://www.google.com/recaptcha/',
             'https://js.stripe.com',
         ],
-        'style-src': ["'self'", "'unsafe-inline'"],
+        'style-src': ["'self'", 'https://cdnjs.cloudflare.com'],
     })
     
     is_development = os.getenv('FLASK_ENV', 'development') == 'development'
@@ -300,6 +301,7 @@ def create_app():
                              stripe_key=app.config['STRIPE_PUBLISHABLE_KEY'])
 
     @app.route('/submit', methods=['POST'])
+    @csrf.exempt #test purposes
     @limiter.limit("30 per hour")  # Limit story generation
     def submit():
         recaptcha_response = request.form.get('g-recaptcha-response')
@@ -404,6 +406,7 @@ def create_app():
     @app.route('/create-checkout-session', methods=['POST'])
     @limiter.limit("10 per hour") 
     def create_checkout_session():
+        print("in checkout session")
         if 'user' not in session:
             return jsonify({"error": "Please log in to purchase credits"}), 401
 

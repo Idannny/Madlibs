@@ -39,8 +39,9 @@
         <button class="btn btn-primary" onclick="shareStory()">Share Story</button>
     </div>
 </div>
+<script src="{{ url_for('static', filename='js/story.js') }}"></script>
 
-<script>
+<!-- <script>
 function shareStory() {
     // Create a temporary textarea to hold the story content
     const textArea = document.createElement('textarea');
@@ -60,5 +61,5 @@ function shareStory() {
         document.body.removeChild(textArea);
     }
 }
-</script>
+</script> -->
 {% endblock %} 
