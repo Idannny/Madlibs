@@ -15,6 +15,7 @@ import secrets
 from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
 import bleach
+from forms import RegistrationForm
 
 load_dotenv()  # Load environment variables from .env file
 csrf = CSRFProtect()
@@ -40,14 +41,15 @@ def create_app():
     
     is_development = os.getenv('FLASK_ENV', 'development') == 'development'
 
+    app.secret_key = os.getenv('CSRF_TOKEN')
+
+
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY'),
         STRIPE_KEY=os.getenv('STRIPE_SECRET'),
         STRIPE_PUBLISHABLE_KEY=os.getenv('STRIPE_PUBLISHABLE_KEY'),
         SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL'),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        
-        # Use appropriate reCAPTCHA keys based on environment
         RECAPTCHA_SITE_KEY=os.getenv('RECAPTCHA_SITE_KEY_DEV' if is_development else 'RECAPTCHA_SITE_KEY_PROD'),
         RECAPTCHA_SECRET=os.getenv('RECAPTCHA_SECRET_DEV' if is_development else 'RECAPTCHA_SECRET_PROD'),
     )
@@ -226,6 +228,7 @@ def create_app():
     @app.route('/register', methods=['GET', 'POST'])
     @limiter.limit("5 per hour")  # Limit registration attempts
     def register():
+        form = RegistrationForm()
         if request.method == 'POST':
             name = request.form.get('name')
             email = request.form.get('email')
@@ -242,11 +245,12 @@ def create_app():
             
             # Send verification email
             send_verification_email(user)
-            
-            flash('Registration successful! Please check your email to verify your account.')
-            return redirect(url_for('login'))
+            if form.validate_on_submit():
+
+                flash('Account created successfully, check your email!', 'success')
+                return redirect(url_for('login'))
         
-        return render_template('register.html')
+        return render_template('register.html', form=form)
 
     @app.route('/verify-email/<token>')
     def verify_email(token):

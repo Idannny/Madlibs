@@ -16,8 +16,9 @@
 
     <div class="auth-options">
         <div class="auth-form">Z
-            {{ csrf_token() }}
+
             <form method="post" action="{{ url_for('login') }}">
+                {{ form.hidden_tag() }}
                 <div class="form-group">
                     <label for="email">Email</label>
                     <input type="email" id="email" name="email" required>
@@ -45,7 +46,7 @@
         </div>
 
         <form id="resend-verification-form" method="post" action="{{ url_for('resend_verification') }}" style="display: none;">
-            {{ csrf_token() }}
+            {{ form.hidden_tag() }}
             <div class="form-group">
                 <label for="resend-email">Email</label>
                 <input type="email" id="resend-email" name="email" required>
