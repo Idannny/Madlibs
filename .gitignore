@@ -14,3 +14,4 @@ dist/
 build/
 *.egg-info/
 database_test.py
+mail_test.py

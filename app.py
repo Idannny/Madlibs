@@ -16,6 +16,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
 import bleach
 from forms import RegistrationForm
+import traceback
 
 load_dotenv()  # Load environment variables from .env file
 csrf = CSRFProtect()
@@ -52,6 +53,11 @@ def create_app():
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         RECAPTCHA_SITE_KEY=os.getenv('RECAPTCHA_SITE_KEY_DEV' if is_development else 'RECAPTCHA_SITE_KEY_PROD'),
         RECAPTCHA_SECRET=os.getenv('RECAPTCHA_SECRET_DEV' if is_development else 'RECAPTCHA_SECRET_PROD'),
+        MAIL_SERVER=os.getenv('MAIL_SERVER'),
+        MAIL_PORT=os.getenv('MAIL_PORT'),
+        MAIL_USE_TLS=os.getenv('MAIL_USE_TLS'),
+        MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+        MAIL_PASSWORD=os.getenv('MAIL_PASSWORD')
     )
 
     oauth = OAuth(app)
@@ -105,23 +111,36 @@ def create_app():
             return False
 
     def send_verification_email(user):
-        token = user.generate_verification_token()
-        db.session.commit()
-        
-        verification_url = url_for('verify_email', token=token, _external=True)
-        
-        msg = Message('Verify Your Email',
-                      sender=os.getenv('MAIL_USERNAME'),
-                      recipients=[user.email])
-        msg.body = f'''Please click the following link to verify your email:
-                    {verification_url}
+        try:
 
-                    This link will expire in 24 hours.
+            print(f"Attempting to send email to {user.email}")
+            # print(f"MAIL_SERVER: {app.config['MAIL_SERVER']}")
+            # print(f"MAIL_PORT: {app.config['MAIL_PORT']}")
+            # print(f"MAIL_USE_TLS: {app.config['MAIL_USE_TLS']}")
+            # print(f"MAIL_USERNAME: {app.config['MAIL_USERNAME']}")
 
-                    If you did not create an account, please ignore this email.
-                    '''
-        mail.send(msg)
+            token = user.generate_verification_token()
+            db.session.commit()
+            verification_url = url_for('verify_email', token=token, _external=True)
+            print("Sending Verification Email")
 
+            msg = Message('Verify Your Email',
+                        sender=os.getenv('MAIL_USERNAME'),
+                        recipients=[user.email])
+            msg.body = f'''Please click the following link to verify your email:
+                        {verification_url}
+                        This link will expire in 24 hours.
+                        If you did not create an account, please ignore this email.
+                        '''
+            mail.send(msg)
+
+            print("Email sent successfully")
+
+        except Exception as e:
+            print(f"Error sending email: {str(e)}")
+            # Log the full exception for debugging
+            
+            traceback.print_exc()
 
     def sanitize_input(text):
     # Remove any HTML tags or dangerous characters
@@ -160,6 +179,8 @@ def create_app():
     @app.route('/login', methods=['GET', 'POST'])
     @limiter.limit("10 per hour")  # Limit login attempts
     def login():
+        form = RegistrationForm()
+
         if request.method == 'POST':
             email = request.form.get('email')
             password = request.form.get('password')
@@ -180,7 +201,7 @@ def create_app():
             flash('Invalid email or password.')
             return redirect(url_for('login'))
         
-        return render_template('login.html')
+        return render_template('login.html', form=form)
 
     @app.route('/google-login')
     def google_login():
@@ -240,6 +261,7 @@ def create_app():
             
             user = User(name=name, email=email)
             user.set_password(password)
+
             db.session.add(user)
             db.session.commit()
             

@@ -45,7 +45,7 @@
         <div class="form-container">
             <h2>Create Your Story</h2>
             <form action="{{ url_for('submit') }}" method="post" id="submit-form">
-                <!--{{ csrf_token() }}-->
+               
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="artstyle">Art Style</label>
@@ -111,7 +111,8 @@
         {% endif %}
     </div>
 
-    <div class="loading-screen" style="display: none;">
+    <div class="loading-screen>
+
         <div class="loading-content">
             <img src="{{ url_for('static', filename='/images/loading.gif') }}" alt="Loading...">
             <p>Generating your story...</p>
@@ -129,12 +130,13 @@
 
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <script src="https://js.stripe.com/v3/"></script>
-<!-- <script src="{{ url_for('static', filename='js/index.js') }}"></script> -->
+<script src="{{ url_for('static', filename='/js/main.js') }}"></script>
 
-<script>
+<!-- <script>
     const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
     
     async function purchaseCredits(credits) {
+            consol.log("HELLO WORTK")
         try {
             const button = event.target;
             const originalText = button.textContent;
@@ -171,9 +173,9 @@
             button.textContent = originalText;
         }
     }
-</script>
+</script> -->
 
-<script>
+<!-- <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
     const loadingScreen = document.querySelector('.loading-screen');
@@ -229,5 +231,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-</script> 
+</script>  -->
 {% endblock %}

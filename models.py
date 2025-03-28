@@ -7,7 +7,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255)) 
     credits = db.Column(db.Integer, default=0)
     free_tries_left = db.Column(db.Integer, default=3)
     is_paid_user = db.Column(db.Boolean, default=False)

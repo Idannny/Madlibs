@@ -15,7 +15,7 @@
     {% endwith %}
 
     <div class="auth-options">
-        <div class="auth-form">Z
+        <div class="auth-form">
 
             <form method="post" action="{{ url_for('login') }}">
                 {{ form.hidden_tag() }}
@@ -55,7 +55,7 @@
         </form>
     </div>
 </div>
-<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+<script src="{{ url_for('static', filename='/js/login.js') }}"></script>
 
 <!-- <script>
 function showResendForm() {
