@@ -18,7 +18,7 @@ import bleach
 from forms import RegistrationForm
 import traceback
 
-load_dotenv()  # Load environment variables from .env file
+load_dotenv()  
 csrf = CSRFProtect()
 
 def create_app():
@@ -37,7 +37,7 @@ def create_app():
             'https://www.google.com/recaptcha/',
             'https://js.stripe.com',
         ],
-        'style-src': ["'self'", 'https://cdnjs.cloudflare.com'],
+       
     })
     
     is_development = os.getenv('FLASK_ENV', 'development') == 'development'
@@ -171,6 +171,7 @@ def create_app():
             # Anonymous user
             free_tries = 3 - session.get('usage_count', 0)
 
+            print("User Name: ", user_info)
         return render_template('index.html', 
                              user_info=user_info, 
                              credits=credits,
@@ -331,7 +332,8 @@ def create_app():
     @limiter.limit("30 per hour")  # Limit story generation
     def submit():
         recaptcha_response = request.form.get('g-recaptcha-response')
-        app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
+        
+        # app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
         
         if not verify_recaptcha(recaptcha_response):
             return jsonify({"error": "Please complete the CAPTCHA."}), 400
@@ -411,7 +413,7 @@ def create_app():
                 )
                 db.session.add(story)
                 db.session.commit()
-
+                print("story: ",story_content)
             return jsonify({"story": story_content, "image": image_url})
 
         except Exception as e:

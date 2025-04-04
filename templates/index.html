@@ -3,6 +3,7 @@
 {% block title %}Ad-Lib Game AI Generated{% endblock %}
 
 {% block content %}
+
 <div class="main-container">
     <div class="header-section">
         <h1>(M)Ad-Lib Game</h1>
@@ -103,9 +104,9 @@
         <div class="purchase-credits">
             <h2>Purchase Credits</h2>
             <div class="credit-options">
-                <button onclick="purchaseCredits(1)" class="credit-option">1 Credit - $1</button>
-                <button onclick="purchaseCredits(5)" class="credit-option">5 Credits - $5</button>
-                <button onclick="purchaseCredits(10)" class="credit-option">10 Credits - $10</button>
+                <button class="credit-option" data-credits="1">1 Credit - $1</button>
+                <button class="credit-option" data-credits="5">5 Credits - $5</button>
+                <button class="credit-option" data-credits="10">10 Credits - $10</button>
             </div>
         </div>
         {% endif %}
@@ -118,122 +119,14 @@
         </div>
     </div>
 
-    <div id="result" class="result-container" style="display: none;">
+    <div id="result" class="result-container hidden">
         <h2>Your Ad-Lib Story</h2>
         <div class="story-content">
             <p id="story"></p>
-            <img id="image" src="" alt="DALL-E Image">
+            <img id="image"  alt="DALL-E Image">
         </div>
     </div>
 </div>
 
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script src="https://js.stripe.com/v3/"></script>
-<!-- <script src="{{ url_for('static', filename='/js/base.js') }}"></script> -->
-<script>
-    function showLoadingScreen() {
-        const loadingScreen = document.getElementById('loading-screen');
-        loadingScreen.classList.remove('hidden');
-    }
-</script>
-<script>
-    const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
-    
-    async function purchaseCredits(credits) {
-            
-        try {
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Processing...';
 
-            const response = await fetch('/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ credits: credits })
-            });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const session = await response.json();
-            
-            const result = await stripe.redirectToCheckout({
-                sessionId: session.id
-            });
-
-            if (result.error) {
-                throw new Error(result.error.message);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('There was a problem with your payment. Please try again.');
-            
-            const button = event.target;
-            button.disabled = false;
-            button.textContent = originalText;
-        }
-    }
-</script> 
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('submit-form');
-    const loadingScreen = document.querySelector('loading-screen');
-    const resultDiv = document.getElementById('result');
-    
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const recaptchaResponse = grecaptcha.getResponse();
-        if (!recaptchaResponse) {
-            alert('Please complete the CAPTCHA');
-            return;
-        }
-
-        loadingScreen.style.display = 'none';
-        resultDiv.style.display = 'none';
-
-        let formData = new FormData(form);
-        formData.append('g-recaptcha-response', recaptchaResponse);
-        
-        fetch('{{ url_for("submit") }}', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            loadingScreen.style.display = 'none';
-            
-            if (data.error) {
-                alert(data.error);
-                if (data.require_login) {
-                    window.location.href = '{{ url_for("login") }}';
-                } else if (data.require_payment) {
-                    const purchaseSection = document.querySelector('.purchase-credits');
-                    if (purchaseSection) {
-                        purchaseSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                }
-            } else {
-                document.getElementById('story').textContent = data.story;
-                document.getElementById('image').src = data.image;
-                resultDiv.style.display = 'block';
-                resultDiv.scrollIntoView({ behavior: 'smooth' });
-            }
-        })
-        .catch(error => {
-            loadingScreen.style.display = 'none';
-            console.error('Error:', error);
-            alert('An error occurred. Please try again.');
-        })
-        .finally(() => {
-            grecaptcha.reset();
-        });
-    });
-});
-</script>  
 {% endblock %}

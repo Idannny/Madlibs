@@ -1,18 +1,20 @@
 const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
     
 async function purchaseCredits(credits) {
-    consol.log("HELLO WOR")
-
+        console.log("Attempting to purchase credits: ")
     try {
+
         const button = event.target;
         const originalText = button.textContent;
         button.disabled = true;
         button.textContent = 'Processing...';
-
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        console.log("CSRF Token:", csrfToken);
         const response = await fetch('/create-checkout-session', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken // Include CSRF token
             },
             body: JSON.stringify({ credits: credits })
         });
@@ -40,11 +42,25 @@ async function purchaseCredits(credits) {
     }
 }
 
+
+function showLoadingScreen() {
+    const loadingScreen = document.getElementById('loading-screen');
+    loadingScreen.classList.remove('hidden');
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
-    const loadingScreen = document.querySelector('.loading-screen');
-    const resultDiv = document.getElementById('result');
+    // const loadingScreen = document.querySelector('loading-screen');
+    // 2const resultDiv = document.getElementById('result');
     
+    initializeButtons();
+    initializeForm(form);
+});
+
+
+function initializeForm(daform) {
+    const form = daform;
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -54,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        loadingScreen.style.display = 'flex';
+        loadingScreen.style.display = 'none';
         resultDiv.style.display = 'none';
 
         let formData = new FormData(form);
@@ -94,4 +110,15 @@ document.addEventListener('DOMContentLoaded', function() {
             grecaptcha.reset();
         });
     });
-});
+}
+
+function initializeButtons() {
+    const buttons = document.querySelectorAll('.credit-option');
+
+    buttons.forEach(button => {
+        button.addEventListener('click', function() {
+            const credits = this.getAttribute('data-credits');
+            purchaseCredits(credits);
+        });
+    });
+}

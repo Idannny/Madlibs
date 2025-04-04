@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Madness{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-
-
+  
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://js.stripe.com/v3/" async defer></script>
+    
+    <script src="{{ url_for('static', filename='/js/index.js') }}" async defer></script>
+    <script src="{{ url_for('static', filename='/js/base.js') }}" defer></script>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
 </head>
 <body>
     <!-- Top Banner -->
@@ -47,46 +51,8 @@
         </div>
     </footer>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            const loadingScreen = document.getElementById('loading-screen');
-
-            form.addEventListener('submit', function() {
-                loadingScreen.style.display = 'flex';
-            });
-        });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            const loadingScreen = document.getElementById('loading-screen');
-
-            // Handle form submission (e.g., Purchase Tokens form)
-            if (form) {
-                form.addEventListener('submit', function() {
-                    loadingScreen.style.display = 'flex';
-                });
-            }
-
-            // Handle Sign In with Google button click
-            const signInButton = document.querySelector('.btn-sign-in');
-            if (signInButton) {
-                signInButton.addEventListener('click', function(event) {
-                    if (!session.get('user')) {
-                        event.preventDefault(); // Prevent default action (redirect)
-                        window.location.href = "{{ url_for('login') }}"; // Redirect to login route
-                        // Alternatively, you can trigger the OAuth flow here
-                    }
-                });
-            }
-        });
-    </script>
-
     <div id="end">
     </div>  
-    <script src="{{ url_for('static', filename='/js/base.js') }}"></script>
 
 </body>
 </html>
