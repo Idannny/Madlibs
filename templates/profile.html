@@ -33,21 +33,21 @@
                     <h4>Basic Pack</h4>
                     <p class="price">$1</p>
                     <p class="credits">1 Credit</p>
-                    <button onclick="purchaseCredits(1)" class="purchase-btn">Purchase</button>
+                    <button data-credits="1" class="purchase-btn">Purchase</button>
                 </div>
                 <div class="credit-package featured">
                     <h4>Popular Pack</h4>
                     <p class="price">$5</p>
                     <p class="credits">5 Credits</p>
                     <p class="savings">Save 0%</p>
-                    <button onclick="purchaseCredits(5)" class="purchase-btn">Purchase</button>
+                    <button data-credits="5" class="purchase-btn">Purchase</button>
                 </div>
                 <div class="credit-package">
                     <h4>Premium Pack</h4>
                     <p class="price">$10</p>
                     <p class="credits">10 Credits</p>
                     <p class="savings">Best Value!</p>
-                    <button onclick="purchaseCredits(10)" class="purchase-btn">Purchase</button>
+                    <button data-credits="1" class="purchase-btn">Purchase</button>
                 </div>
             </div>
         </div>
@@ -75,52 +75,6 @@
         </div>
     </div>
 </div>
-<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 
-<script src="https://js.stripe.com/v3/"></script>
-<!-- <script>
-    const stripe = Stripe('{{ stripe_key }}');
-    
-    async function purchaseCredits(credits) {
-        try {
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Processing...';
 
-            const response = await fetch('/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ credits: credits })
-            });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const session = await response.json();
-            
-            const result = await stripe.redirectToCheckout({
-                sessionId: session.id
-            });
-
-            if (result.error) {
-                throw new Error(result.error.message);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('There was a problem with your payment. Please try again.');
-            
-            const button = event.target;
-            button.disabled = false;
-            button.textContent = originalText;
-        }
-    }
-
-    function viewStory(storyId) {
-        window.location.href = `/story/${storyId}`;
-    }
-</script> -->
 {% endblock %}

@@ -31,7 +31,7 @@ def create_app():
             "'self'",
             'https://www.google.com/recaptcha/',
             'https://www.gstatic.com/recaptcha/',
-            'https://js.stripe.com',
+            'https://js.stripe.com'
         ],
         'frame-src': [
             'https://www.google.com/recaptcha/',

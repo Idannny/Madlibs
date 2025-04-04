@@ -114,11 +114,18 @@ function initializeForm(daform) {
 
 function initializeButtons() {
     const buttons = document.querySelectorAll('.credit-option');
-
     buttons.forEach(button => {
         button.addEventListener('click', function() {
             const credits = this.getAttribute('data-credits');
+            console.log("initialized button")
             purchaseCredits(credits);
         });
     });
+
+    const shareButton = document.querySelector('.btn.btn-primary');
+    if (shareButton) {
+        shareButton.addEventListener('click', function() {
+            shareStory();
+        });
+    }
 }
