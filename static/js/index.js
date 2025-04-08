@@ -1,66 +1,41 @@
-const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
-    
-async function purchaseCredits(credits) {
-        console.log("Attempting to purchase credits: ")
-    try {
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const loadingScreen = document.getElementById('loading-screen');
 
-        const button = event.target;
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Processing...';
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        console.log("CSRF Token:", csrfToken);
-        const response = await fetch('/create-checkout-session', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken // Include CSRF token
-            },
-            body: JSON.stringify({ credits: credits })
+    // Handle form submission (e.g., Purchase Tokens form)
+    if (form) {
+        form.addEventListener('submit', function() {
+            console.log("submitted form")
+            loadingScreen.style.display = 'flex';
         });
-
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-
-        const session = await response.json();
-        
-        const result = await stripe.redirectToCheckout({
-            sessionId: session.id
-        });
-
-        if (result.error) {
-            throw new Error(result.error.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('There was a problem with your payment. Please try again.');
-        
-        const button = event.target;
-        button.disabled = false;
-        button.textContent = originalText;
     }
-}
 
+    // Handle Sign In with Google button click
+    const signInButton = document.querySelector('.btn-sign-in');
+    if (signInButton) {
+        signInButton.addEventListener('click', function(event) {
+            if (!session.get('user')) {
+                event.preventDefault(); // Prevent default action (redirect)
+                window.location.href = "{{ url_for('login') }}"; // Redirect to login route
+
+            }
+        });
+    }
+});
 
 function showLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
-    loadingScreen.classList.remove('hidden');
+    // loadingScreen.classList.remove('hidden');
 }
 
 
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
-    // const loadingScreen = document.querySelector('loading-screen');
-    // 2const resultDiv = document.getElementById('result');
+    const loadingScreen = document.getElementById('loading-screen');
+    const resultDiv = document.getElementById('result');
     
-    initializeButtons();
-    initializeForm(form);
-});
-
-
-function initializeForm(daform) {
-    const form = daform;
+    if (!form) return; // Exit if form not found
+    
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -70,24 +45,33 @@ function initializeForm(daform) {
             return;
         }
 
-        loadingScreen.style.display = 'none';
-        resultDiv.style.display = 'none';
+        // Show loading screen and hide result
+        loadingScreen.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
 
         let formData = new FormData(form);
         formData.append('g-recaptcha-response', recaptchaResponse);
         
-        fetch('{{ url_for("submit") }}', {
+        const submitUrl = form.getAttribute('data-submit-url');
+        
+        fetch(submitUrl, {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            loadingScreen.style.display = 'none';
+            // Hide loading screen
+            loadingScreen.classList.add('hidden');
             
             if (data.error) {
                 alert(data.error);
                 if (data.require_login) {
-                    window.location.href = '{{ url_for("login") }}';
+                    window.location.href = '/login';
                 } else if (data.require_payment) {
                     const purchaseSection = document.querySelector('.purchase-credits');
                     if (purchaseSection) {
@@ -97,35 +81,19 @@ function initializeForm(daform) {
             } else {
                 document.getElementById('story').textContent = data.story;
                 document.getElementById('image').src = data.image;
-                resultDiv.style.display = 'block';
+                resultDiv.classList.remove('hidden');
                 resultDiv.scrollIntoView({ behavior: 'smooth' });
             }
         })
         .catch(error => {
-            loadingScreen.style.display = 'none';
             console.error('Error:', error);
-            alert('An error occurred. Please try again.');
+            loadingScreen.classList.add('hidden');
+            alert('An error occurred while generating your story. Please try again.');
         })
         .finally(() => {
             grecaptcha.reset();
         });
     });
-}
+});
 
-function initializeButtons() {
-    const buttons = document.querySelectorAll('.credit-option');
-    buttons.forEach(button => {
-        button.addEventListener('click', function() {
-            const credits = this.getAttribute('data-credits');
-            console.log("initialized button")
-            purchaseCredits(credits);
-        });
-    });
 
-    const shareButton = document.querySelector('.btn.btn-primary');
-    if (shareButton) {
-        shareButton.addEventListener('click', function() {
-            shareStory();
-        });
-    }
-}

@@ -3,6 +3,12 @@
 {% block title %}Profile - {{ user.name }}{% endblock %}
 
 {% block content %}
+
+{% block meta %}
+<meta name="description" content="View and manage your profile, credits, and story history.">
+<meta name="author" content="{{ user.name }}">
+{% endblock %}
+
 <div class="profile-container">
     <div class="profile-header">
         <h1>Your Profile</h1>
@@ -33,21 +39,21 @@
                     <h4>Basic Pack</h4>
                     <p class="price">$1</p>
                     <p class="credits">1 Credit</p>
-                    <button data-credits="1" class="purchase-btn">Purchase</button>
+                    <button data-credits="1" class="credit-option">Purchase</button>
                 </div>
                 <div class="credit-package featured">
                     <h4>Popular Pack</h4>
                     <p class="price">$5</p>
                     <p class="credits">5 Credits</p>
                     <p class="savings">Save 0%</p>
-                    <button data-credits="5" class="purchase-btn">Purchase</button>
+                    <button data-credits="5" class="credit-option">Purchase</button>
                 </div>
                 <div class="credit-package">
                     <h4>Premium Pack</h4>
                     <p class="price">$10</p>
                     <p class="credits">10 Credits</p>
                     <p class="savings">Best Value!</p>
-                    <button data-credits="1" class="purchase-btn">Purchase</button>
+                    <button data-credits="1" class="credit-option">Purchase</button>
                 </div>
             </div>
         </div>
@@ -77,4 +83,8 @@
 </div>
 
 
+{% endblock %}
+
+{% block script %}
+<script src="{{ url_for('static', filename='/js/stripe.js') }}" defer></script>
 {% endblock %}

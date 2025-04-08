@@ -12,45 +12,45 @@ from flask_mail import Mail, Message
 import logging
 from datetime import datetime, timedelta
 import secrets
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, validate_csrf
 from flask_talisman import Talisman
 import bleach
 from forms import RegistrationForm
 import traceback
+from config import config
 
 load_dotenv()  
 csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
+    
+    # Load configuration based on environment
+    env = os.getenv('FLASK_ENV', 'development')
+    app.config.from_object(config[env])
+    
     csrf.init_app(app)
     
-    Talisman(app, content_security_policy={
-        'default-src': "'self'",
-        'script-src': [
-            "'self'",
-            'https://www.google.com/recaptcha/',
-            'https://www.gstatic.com/recaptcha/',
-            'https://js.stripe.com'
-        ],
-        'frame-src': [
-            'https://www.google.com/recaptcha/',
-            'https://js.stripe.com',
-        ],
-       
-    })
+    # Initialize Talisman with secure CSP
+    Talisman(
+        app,
+        content_security_policy=app.config['CSP'],
+        content_security_policy_nonce_in=['script-src'],
+        force_https=True,
+        strict_transport_security=True,
+        session_cookie_secure=True,
+        session_cookie_http_only=True,
+        session_cookie_samesite='Lax'
+    )
     
-    is_development = os.getenv('FLASK_ENV', 'development') == 'development'
+    is_development = env == 'development'
 
     app.secret_key = os.getenv('CSRF_TOKEN')
-
 
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY'),
         STRIPE_KEY=os.getenv('STRIPE_SECRET'),
         STRIPE_PUBLISHABLE_KEY=os.getenv('STRIPE_PUBLISHABLE_KEY'),
-        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL'),
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
         RECAPTCHA_SITE_KEY=os.getenv('RECAPTCHA_SITE_KEY_DEV' if is_development else 'RECAPTCHA_SITE_KEY_PROD'),
         RECAPTCHA_SECRET=os.getenv('RECAPTCHA_SECRET_DEV' if is_development else 'RECAPTCHA_SECRET_PROD'),
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
@@ -114,10 +114,6 @@ def create_app():
         try:
 
             print(f"Attempting to send email to {user.email}")
-            # print(f"MAIL_SERVER: {app.config['MAIL_SERVER']}")
-            # print(f"MAIL_PORT: {app.config['MAIL_PORT']}")
-            # print(f"MAIL_USE_TLS: {app.config['MAIL_USE_TLS']}")
-            # print(f"MAIL_USERNAME: {app.config['MAIL_USERNAME']}")
 
             token = user.generate_verification_token()
             db.session.commit()
@@ -250,6 +246,14 @@ def create_app():
     @app.route('/register', methods=['GET', 'POST'])
     @limiter.limit("5 per hour")  # Limit registration attempts
     def register():
+
+        csrf_token = request.headers.get('X-CSRFToken')
+        try:
+            validate_csrf(csrf_token)
+        except Exception as e:
+            return jsonify({"error": "Invalid CSRF token"}), 403
+
+
         form = RegistrationForm()
         if request.method == 'POST':
             name = request.form.get('name')
@@ -328,9 +332,15 @@ def create_app():
                              stripe_key=app.config['STRIPE_PUBLISHABLE_KEY'])
 
     @app.route('/submit', methods=['POST'])
-    @csrf.exempt #test purposes
-    @limiter.limit("30 per hour")  # Limit story generation
+    @limiter.limit("10 per hour")  # Limit story generation
     def submit():
+        print("submitted waiting for rsponse")
+        csrf_token = request.headers.get('X-CSRFToken')
+        try:
+            validate_csrf(csrf_token)
+        except Exception as e:
+            return jsonify({"error": "Invalid CSRF token"}), 403
+
         recaptcha_response = request.form.get('g-recaptcha-response')
         
         # app.logger.info(f"Received reCAPTCHA response: {recaptcha_response}")
@@ -435,15 +445,25 @@ def create_app():
     @limiter.limit("10 per hour") 
     def create_checkout_session():
         print("in checkout session")
+
+        csrf_token = request.headers.get('X-CSRFToken')
+        try:
+            validate_csrf(csrf_token)
+        except Exception as e:
+            return jsonify({"error": "Invalid CSRF token"}), 403
+
+
         if 'user' not in session:
             return jsonify({"error": "Please log in to purchase credits"}), 401
 
         try:
             stripe.api_key = app.config['STRIPE_KEY']
-            
+            print("stipeKey", app.config['STRIPE_KEY'])
             # Get the number of credits to purchase from the request
+
             credits = int(request.json.get('credits', 1))
             
+
             # Calculate the total amount (1 credit = $1)
             amount = credits * 100  # Convert to cents
             

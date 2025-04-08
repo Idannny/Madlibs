@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission (e.g., Purchase Tokens form)
     if (form) {
         form.addEventListener('submit', function() {
-            console.log("submitted datas")
+            console.log("submitted form")
             loadingScreen.style.display = 'flex';
         });
     }
@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
-    loadingScreen.classList.remove('hidden');
+    // loadingScreen.classList.remove('hidden');
 }
 
 

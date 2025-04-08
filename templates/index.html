@@ -45,7 +45,7 @@
     <div class="game-section">
         <div class="form-container">
             <h2>Create Your Story</h2>
-            <form action="{{ url_for('submit') }}" method="post" id="submit-form" onsubmit="showLoadingScreen()">
+            <form action="{{ url_for('submit') }}" method="post" id="submit-form" data-submit-url="{{ url_for('submit') }}">
                
                 <div class="form-grid">
                     <div class="form-group">
@@ -128,5 +128,9 @@
     </div>
 </div>
 
+{% endblock %}
 
+{% block script %}
+<script src="{{ url_for('static', filename='/js/stripe.js') }}" defer></script>
+<script src="{{ url_for('static', filename='/js/index.js') }}" defer></script>
 {% endblock %}
