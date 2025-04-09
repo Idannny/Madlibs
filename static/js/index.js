@@ -47,10 +47,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Show loading screen and hide result
         loadingScreen.classList.remove('hidden');
-        resultDiv.classList.add('hidden');
+        resultDiv.classList.remove('hidden');
 
         let formData = new FormData(form);
         formData.append('g-recaptcha-response', recaptchaResponse);
+
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        formData.append('csrf_token', csrfToken);
         
         const submitUrl = form.getAttribute('data-submit-url');
         
@@ -67,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             // Hide loading screen
             loadingScreen.classList.add('hidden');
-            
+            resultDiv.classList.add('hidden');
+
             if (data.error) {
                 alert(data.error);
                 if (data.require_login) {

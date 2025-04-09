@@ -46,7 +46,7 @@
         <div class="form-container">
             <h2>Create Your Story</h2>
             <form action="{{ url_for('submit') }}" method="post" id="submit-form" data-submit-url="{{ url_for('submit') }}">
-               
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="artstyle">Art Style</label>
