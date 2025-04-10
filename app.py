@@ -18,20 +18,18 @@ import bleach
 from forms import RegistrationForm
 import traceback
 from config import config
+import logging
 
 load_dotenv()  
-csrf = CSRFProtect()
+
 
 def create_app():
-    app = Flask(__name__)
-    
-    # Load configuration based on environment
     env = os.getenv('FLASK_ENV', 'development')
+    app = Flask(__name__)
     app.config.from_object(config[env])
-    
-    csrf.init_app(app)
-    
-    # Initialize Talisman with secure CSP
+    csrf = CSRFProtect(app)
+    logging.basicConfig(level=logging.INFO)
+
     Talisman(
         app,
         content_security_policy=app.config['CSP'],
@@ -334,10 +332,12 @@ def create_app():
     @app.route('/submit', methods=['POST'])
     @limiter.limit("10 per hour")  # Limit story generation
     def submit():
-        print("submitted waiting for rsponse")
-        csrf_token = request.headers.get('X-CSRFToken')
+        csrf_token = request.form.get('csrf_token')
+        print(f"Received CSRF token: {csrf_token}")
+        app.logger.info(f"Recieved CSRF token:{csrf_token}")
         try:
             validate_csrf(csrf_token)
+            
         except Exception as e:
             return jsonify({"error": "Invalid CSRF token"}), 403
 

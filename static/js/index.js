@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     const loadingScreen = document.getElementById('loading-screen');
+    const signInButton = document.querySelector('.btn-sign-in');
 
     // Handle form submission (e.g., Purchase Tokens form)
     if (form) {
@@ -10,8 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Handle Sign In with Google button click
-    const signInButton = document.querySelector('.btn-sign-in');
     if (signInButton) {
         signInButton.addEventListener('click', function(event) {
             if (!session.get('user')) {
@@ -25,53 +24,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
-    // loadingScreen.classList.remove('hidden');
+    loadingScreen.classList.remove('hidden');
 }
-
 
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
     const loadingScreen = document.getElementById('loading-screen');
     const resultDiv = document.getElementById('result');
+    const submitButton = document.getElementById('submit-button'); 
     
-    if (!form) return; // Exit if form not found
-    
+   
+    window.onReCaptchaSuccess = function() {
+        submitButton.disabled = false;
+    };
+
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
+        loadingScreen.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
+
+        const submitUrl = form.getAttribute('data-submit-url');
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         const recaptchaResponse = grecaptcha.getResponse();
+        console.log("Recaptcha:  ",recaptchaResponse)
+        const formData = new FormData(form);
+
         if (!recaptchaResponse) {
             alert('Please complete the CAPTCHA');
             return;
         }
 
-        // Show loading screen and hide result
-        loadingScreen.classList.remove('hidden');
-        resultDiv.classList.remove('hidden');
-
-        let formData = new FormData(form);
         formData.append('g-recaptcha-response', recaptchaResponse);
-
-        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         formData.append('csrf_token', csrfToken);
         
-        const submitUrl = form.getAttribute('data-submit-url');
-        
+        submitButton.disabled = true;
+
+
         fetch(submitUrl, {
             method: 'POST',
             body: formData
         })
         .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
+            console.log('Response status:', response.status); 
+            return response.json().then(data => {
+                if (!response.ok) {
+                    console.error('Error response data:', data); 
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return data;
+            });
         })
         .then(data => {
             // Hide loading screen
             loadingScreen.classList.add('hidden');
-            resultDiv.classList.add('hidden');
-
+            
             if (data.error) {
                 alert(data.error);
                 if (data.require_login) {
@@ -90,12 +98,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
             loadingScreen.classList.add('hidden');
+            console.error('Error:', error);
             alert('An error occurred while generating your story. Please try again.');
         })
         .finally(() => {
             grecaptcha.reset();
+            submitButton.disabled = true;
         });
     });
 });

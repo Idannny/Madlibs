@@ -31,7 +31,8 @@ class Config:
             'data:',
             'https://lh3.googleusercontent.com',
             'https://*.stripe.com',
-            'https://*.openai.com'
+            'https://*.openai.com',
+            'https://www.gstatic.com'
         ],
         'frame-src': [
             'https://www.google.com/recaptcha/',
@@ -39,7 +40,7 @@ class Config:
             'https://hooks.stripe.com'
         ],
         'form-action': ["'self'"],
-        'frame-ancestors': ["'none'"],
+        'frame-ancestors': ["'none'",'https://www.google.com'],
         'base-uri': ["'self'"],
         'object-src': ["'none'"],
         'upgrade-insecure-requests': True
@@ -55,6 +56,14 @@ class DevelopmentConfig(Config):
             'https://api.stripe.com',
             'https://api.openai.com',
             'https://*.stripe.com'
+        ],
+        'img-src': [
+            "'self'",
+            'data:',
+            'https://lh3.googleusercontent.com',
+            'https://*.stripe.com',
+            'https://*.openai.com',
+            'https://oaidallepiprodscus'
         ]
     }
 
@@ -68,6 +77,13 @@ class ProductionConfig(Config):
             'https://api.stripe.com',
             'https://api.openai.com',
             'https://*.stripe.com'
+        ],
+        'img-src': [
+            "'self'",
+            'data:',
+            'https://lh3.googleusercontent.com',
+            'https://*.stripe.com',
+            'https://*.openai.com'
         ]
     }
 
