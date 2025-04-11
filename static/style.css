@@ -211,6 +211,10 @@ img {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+#result.hidden {
+display: none;
+}
+
 #result h2 {
     color: #333;
     margin-bottom: 20px;

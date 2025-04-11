@@ -22,10 +22,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function showLoadingScreen() {
-    const loadingScreen = document.getElementById('loading-screen');
-    loadingScreen.classList.remove('hidden');
-}
 
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('submit-form');
@@ -43,7 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         loadingScreen.classList.remove('hidden');
-        resultDiv.classList.add('hidden');
 
         const submitUrl = form.getAttribute('data-submit-url');
         const csrfToken = document.querySelector('input[name="csrf_token"]').value;
@@ -105,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .finally(() => {
             grecaptcha.reset();
             submitButton.disabled = true;
+            loadingScreen.classList.add('hidden');
         });
     });
 });

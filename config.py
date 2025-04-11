@@ -60,10 +60,11 @@ class DevelopmentConfig(Config):
         'img-src': [
             "'self'",
             'data:',
+            'https:',
             'https://lh3.googleusercontent.com',
             'https://*.stripe.com',
             'https://*.openai.com',
-            'https://oaidallepiprodscus'
+            'blob:'
         ]
     }
 
