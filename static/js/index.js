@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission (e.g., Purchase Tokens form)
     if (form) {
         form.addEventListener('submit', function() {
-            console.log("submitted form")
             loadingScreen.style.display = 'flex';
         });
     }
@@ -29,21 +28,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultDiv = document.getElementById('result');
     const submitButton = document.getElementById('submit-button'); 
     
-   
+    const freeTries = parseInt(form.getAttribute('data-free-tries'), 10);
+
+    if (freeTries <= 0 ) {
+        submitButton.disabled = true;
+    }
+
     window.onReCaptchaSuccess = function() {
         submitButton.disabled = false;
     };
 
-
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-
+ 
         loadingScreen.classList.remove('hidden');
 
         const submitUrl = form.getAttribute('data-submit-url');
-        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const recaptchaResponse = grecaptcha.getResponse();
-        console.log("Recaptcha:  ",recaptchaResponse)
         const formData = new FormData(form);
 
         if (!recaptchaResponse) {
@@ -51,29 +53,35 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+
         formData.append('g-recaptcha-response', recaptchaResponse);
         formData.append('csrf_token', csrfToken);
         
-        submitButton.disabled = true;
-
-
         fetch(submitUrl, {
             method: 'POST',
             body: formData
         })
         .then(response => {
             console.log('Response status:', response.status); 
-            return response.json().then(data => {
-                if (!response.ok) {
-                    console.error('Error response data:', data); 
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return data;
-            });
+            loadingScreen.classList.add('hidden');
+        
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        console.error('Error response data:', data); 
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return data;
+                });
+            } else {
+                // Handle non-JSON response
+                console.error('Expected JSON response but got:', contentType);
+                throw new Error('Server returned a non-JSON response');
+            }
         })
         .then(data => {
-            // Hide loading screen
-            loadingScreen.classList.add('hidden');
             
             if (data.error) {
                 alert(data.error);
@@ -93,14 +101,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            loadingScreen.classList.add('hidden');
             console.error('Error:', error);
-            alert('An error occurred while generating your story. Please try again.');
+            alert('An error occurred while generating your story. Please try again: ', error);
         })
         .finally(() => {
             grecaptcha.reset();
             submitButton.disabled = true;
-            loadingScreen.classList.add('hidden');
+            loadingScreen.style.display = 'none';
+
+
         });
     });
 });

@@ -162,8 +162,8 @@ def create_app():
                 credits = user.credits
                 free_tries = user.free_tries_left
         else:
-            # Anonymous user
-            free_tries = 3 - session.get('usage_count', 0)
+            # Anonymous user    
+            free_tries = 1 - session.get('usage_count', 0)  # Only 1 free try for non-signed-in users
 
             print("User Name: ", user_info)
         return render_template('index.html', 

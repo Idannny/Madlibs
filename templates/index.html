@@ -45,7 +45,7 @@
     <div class="game-section">
         <div class="form-container">
             <h2>Create Your Story</h2>
-            <form  method="post" id="submit-form" data-submit-url="{{ url_for('submit') }}">
+            <form  method="post" id="submit-form" data-submit-url="{{ url_for('submit') }}" data-free-tries="{{ free_tries }}>
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="artstyle">Art Style</label>
