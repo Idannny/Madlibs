@@ -16,3 +16,4 @@ build/
 database_test.py
 mail_test.py
 DEPLOYMENT.md
+*.sql
