@@ -73,7 +73,7 @@ class ProductionConfig(Config):
     CSP = {
         'connect-src': [
             "'self'",
-            'https://madapp.io',
+            'https://wordlibs.ninja',
             'https://www.google.com/recaptcha/',
             'https://api.stripe.com',
             'https://api.openai.com',
@@ -84,7 +84,8 @@ class ProductionConfig(Config):
             'data:',
             'https://lh3.googleusercontent.com',
             'https://*.stripe.com',
-            'https://*.openai.com'
+            'https://*.openai.com',
+            'blob:'
         ]
     }
 
