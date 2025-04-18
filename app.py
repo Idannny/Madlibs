@@ -248,9 +248,8 @@ def create_app():
         
         form = RegistrationForm()
         if request.method == 'POST':
+            
             csrf_token = request.headers.get('X-CSRFToken')
-
-
             name = request.form.get('name')
             email = request.form.get('email')
             password = request.form.get('password')
