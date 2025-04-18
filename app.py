@@ -242,22 +242,25 @@ def create_app():
             google.token = token
 
     @app.route('/register', methods=['GET', 'POST'])
-    @limiter.limit("5 per hour")  # Limit registration attempts
+    @limiter.limit("15 per hour")  # Limit registration attempts
     def register():
-
-        csrf_token = request.headers.get('X-CSRFToken')
-        try:
-            validate_csrf(csrf_token)
-        except Exception as e:
-            return jsonify({"error": "Invalid CSRF token"}), 403
-
-
+        # print("CSRF in register : ",request.headers.get('X-CSRFToken'))
+        
         form = RegistrationForm()
         if request.method == 'POST':
+            csrf_token = request.headers.get('X-CSRFToken')
+
+
             name = request.form.get('name')
             email = request.form.get('email')
             password = request.form.get('password')
-            
+
+            try:
+                validate_csrf(csrf_token)
+            except Exception as e:
+                return jsonify({"error": "Invalid CSRF token"}), 403
+
+
             if User.query.filter_by(email=email).first():
                 flash('Email already registered. Please login or use a different email.')
                 return redirect(url_for('register'))

@@ -3,6 +3,7 @@
 {% block title %}Welcome to (M)Ad-Lib Game - AI-Powered Story Generator{% endblock %}
 
 {% block content %}
+
 <div class="landing-container">
     <div class="hero-section">
         <h1>Welcome to (M)Ad-Lib Game</h1>
@@ -67,3 +68,7 @@
     </div>
 </div>
 {% endblock %} 
+
+{% block script %}
+<script src="{{ url_for('static', filename='/js/landing.js') }}" defer></script>
+{% endblock %}

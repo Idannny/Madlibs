@@ -1,7 +1,7 @@
 const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
     
 async function purchaseCredits(credits) {
-        console.log("Attempting to purchase credits: ")
+        console.log("Purchase credit request ")
     try {
 
         const button = event.target;
@@ -9,7 +9,7 @@ async function purchaseCredits(credits) {
         button.disabled = true;
         button.textContent = 'Processing...';
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        console.log("CSRF Token:", csrfToken);
+        // console.log("CSRF Token:", csrfToken);
         const response = await fetch('/create-checkout-session', {
             method: 'POST',
             headers: {
