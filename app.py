@@ -19,6 +19,7 @@ from forms import RegistrationForm
 import traceback
 from config import config
 import logging
+import email_validator
 
 load_dotenv()  
 
@@ -244,38 +245,29 @@ def create_app():
     @app.route('/register', methods=['GET', 'POST'])
     @limiter.limit("15 per hour")  # Limit registration attempts
     def register():
-        # print("CSRF in register : ",request.headers.get('X-CSRFToken'))
         
         form = RegistrationForm()
         if request.method == 'POST':
             
-            csrf_token = request.headers.get('X-CSRFToken')
-            name = request.form.get('name')
-            email = request.form.get('email')
-            password = request.form.get('password')
-
-            try:
-                validate_csrf(csrf_token)
-            except Exception as e:
-                return jsonify({"error": "Invalid CSRF token"}), 403
-
-
-            if User.query.filter_by(email=email).first():
-                flash('Email already registered. Please login or use a different email.')
-                return redirect(url_for('register'))
-            
-            user = User(name=name, email=email)
-            user.set_password(password)
-
-            db.session.add(user)
-            db.session.commit()
-            
-            # Send verification email
-            send_verification_email(user)
             if form.validate_on_submit():
+                # Check for existing user
+                if User.query.filter_by(email=form.email.data).first():
+                    flash('Email already registered. Please login or use a different email.')
+                    return redirect(url_for('register'))
+                
 
-                flash('Account created successfully, check your email!', 'success')
-                return redirect(url_for('login'))
+                user = User(name=form.name.data, email=form.email.data)
+                user.set_password(form.password.data)
+
+                db.session.add(user)
+                db.session.commit()
+                
+                # Send verification email
+                send_verification_email(user)
+                if form.validate_on_submit():
+
+                    flash('Account created successfully, check your email!', 'success')
+                    return redirect(url_for('login'))
         
         return render_template('register.html', form=form)
 
