@@ -27,16 +27,43 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingScreen = document.getElementById('loading-screen');
     const resultDiv = document.getElementById('result');
     const submitButton = document.getElementById('submit-button'); 
-    
+    const recaptchaResponse = grecaptcha.getResponse();
     const freeTries = parseInt(form.getAttribute('data-free-tries'), 10);
 
-    if (freeTries <= 0 ) {
+    let recaptchaPassed = false;
+
+    if (freeTries <= 0 && recaptchaResponse == false ) {
         submitButton.disabled = true;
     }
 
+    function updateButtonState() {
+        // HTML5 form validation
+        const formValid = form.checkValidity();
+        // Only enable if both are true
+        submitButton.disabled = !(formValid && recaptchaPassed);
+    }
+
+    // Listen for input changes on all form fields
+    Array.from(form.elements).forEach(el => {
+        el.addEventListener('input', updateButtonState);
+        el.addEventListener('change', updateButtonState);
+    });
+
+    // Called by reCAPTCHA when solved
     window.onReCaptchaSuccess = function() {
-        submitButton.disabled = false;
+        recaptchaPassed = true;
+        updateButtonState();
     };
+
+    // Called by reCAPTCHA when expired or reset
+    window.onReCaptchaExpired = function() {
+        recaptchaPassed = false;
+        updateButtonState();
+    };
+
+    // Initial state
+    updateButtonState();
+
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();

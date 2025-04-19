@@ -89,13 +89,15 @@
                         <label for="bodypart">Body Part</label>
                         <input type="text" id="bodypart" name="bodypart" class="form-control" required>
                     </div>
+
+                    <div class="recaptcha-container">
+                        <div class="g-recaptcha" data-sitekey="{{ config['RECAPTCHA_SITE_KEY'] }}" data-callback="onReCaptchaSuccess" data-expired-callback="onReCaptchaExpired">                  
+                    </div>
+
                 </div>
                 
-                <div class="recaptcha-container">
-                    <div class="g-recaptcha" data-sitekey="{{ config['RECAPTCHA_SITE_KEY'] }}" data-callback="onReCaptchaSuccess"></div>
-                </div>
-                
-                <button type="submit" class="btn-submit" id="submit-button">Generate Story</button>
+                <button type="submit" class="btn-submit" id="submit-button" disabled>Generate Story</button>
+
             </form>
         </div>
 

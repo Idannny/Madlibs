@@ -335,8 +335,6 @@ def create_app():
     @limiter.limit("10 per hour")  # Limit story generation
     def submit():
         csrf_token = request.form.get('csrf_token')
-        print(f"Received CSRF token: {csrf_token}")
-        app.logger.info(f"Recieved CSRF token:{csrf_token}")
         try:
             validate_csrf(csrf_token)
             
