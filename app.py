@@ -46,8 +46,10 @@ def create_app():
     app.secret_key = os.getenv('CSRF_TOKEN')
 
     app.config.update(
+        SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL'),
+
         SECRET_KEY=os.getenv('SECRET_KEY'),
-        STRIPE_KEY=os.getenv('STRIPE_SECRET'),
+        STRIPE_KEY=os.getenv('STRIPE_KEY'),
         STRIPE_PUBLISHABLE_KEY=os.getenv('STRIPE_PUBLISHABLE_KEY'),
         RECAPTCHA_SITE_KEY=os.getenv('RECAPTCHA_SITE_KEY_DEV' if is_development else 'RECAPTCHA_SITE_KEY_PROD'),
         RECAPTCHA_SECRET=os.getenv('RECAPTCHA_SECRET_DEV' if is_development else 'RECAPTCHA_SECRET_PROD'),
@@ -110,8 +112,9 @@ def create_app():
 
     def send_verification_email(user):
         try:
-
-            print(f"Attempting to send email to {user.email}")
+            # app.logger.info(f"using email: ",{os.getenv('MAIL_USERNAME')})
+            # app.logger.info(f"using pw: ",{os.getenv('MAIL_PASSWORD')})
+            # app.logger.info(f"Attempting to send email to {user.email}")
 
             token = user.generate_verification_token()
             db.session.commit()
@@ -242,42 +245,33 @@ def create_app():
             google.token = token
 
     @app.route('/register', methods=['GET', 'POST'])
-    @limiter.limit("15 per hour")  # Limit registration attempts
+    @limiter.limit("5 per hour")  # Limit registration attempts
+    @limiter.limit("100 per day")
     def register():
-        # print("CSRF in register : ",request.headers.get('X-CSRFToken'))
-        
+
         form = RegistrationForm()
         if request.method == 'POST':
-            
-            csrf_token = request.headers.get('X-CSRFToken')
-            name = request.form.get('name')
-            email = request.form.get('email')
-            password = request.form.get('password')
-
-            try:
-                validate_csrf(csrf_token)
-            except Exception as e:
-                return jsonify({"error": "Invalid CSRF token"}), 403
-
-
-            if User.query.filter_by(email=email).first():
-                flash('Email already registered. Please login or use a different email.')
-                return redirect(url_for('register'))
-            
-            user = User(name=name, email=email)
-            user.set_password(password)
-
-            db.session.add(user)
-            db.session.commit()
-            
-            # Send verification email
-            send_verification_email(user)
             if form.validate_on_submit():
 
-                flash('Account created successfully, check your email!', 'success')
-                return redirect(url_for('login'))
-        
+                if User.query.filter_by(email=form.email.data).first():
+                    flash('Email already registered. Please login or use a different email.')
+                    return redirect(url_for('register'))
+
+                user = User(name=form.name.data, email=form.email.data)
+                user.set_password(form.password.data)
+
+                db.session.add(user)
+                db.session.commit()
+
+                # Send verification email
+                send_verification_email(user)
+
+                if form.validate_on_submit():
+                    flash('Account created successfully, check your email!', 'success')
+                    return redirect(url_for('login'))
+
         return render_template('register.html', form=form)
+    
 
     @app.route('/verify-email/<token>')
     def verify_email(token):
@@ -446,58 +440,46 @@ def create_app():
     @app.route('/create-checkout-session', methods=['POST'])
     @limiter.limit("10 per hour") 
     def create_checkout_session():
-        print("in checkout session")
-
-        csrf_token = request.headers.get('X-CSRFToken')
-        try:
-            validate_csrf(csrf_token)
-        except Exception as e:
-            return jsonify({"error": "Invalid CSRF token"}), 403
-
-
-        if 'user' not in session:
-            return jsonify({"error": "Please log in to purchase credits"}), 401
+        # csrf_token = request.form.get('csrf_token')
+        # print(f"Received CSRF token: {csrf_token}")
+        # app.logger.info(f"Recieved CSRF token:{csrf_token}")
 
         try:
+            data = request.get_json()
+            credits = data['credits']
+
+            if not isinstance(credits, (int, str)) or not str(credits).isdigit():
+                return jsonify({"error": "Invalid number of credits requested."}), 400
+
+            credits = int(credits)
+            if credits not in [1, 5, 10]:
+                return jsonify({"error": "Invalid credit amount. Choose 1, 5, or 10 credits."}), 400
+
             stripe.api_key = app.config['STRIPE_KEY']
-            print("stipeKey", app.config['STRIPE_KEY'])
-            # Get the number of credits to purchase from the request
-
-            credits = int(request.json.get('credits', 1))
-            
-
-            # Calculate the total amount (1 credit = $1)
-            amount = credits * 100  # Convert to cents
-            
-            success_url = url_for('payment_success', _external=True)
-            cancel_url = url_for('payment_cancel', _external=True)
-
-            checkout_session = stripe.checkout.Session.create(
+            app.logger.debug(f"Stripe key:{stripe.api_key}")
+            session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
                     'price_data': {
                         'currency': 'usd',
                         'product_data': {
-                            'name': f'{credits} Mad Libs Credits',
-                            'description': f'Purchase {credits} credits for AI-generated Mad Libs stories',
+                            'name': f'{credits} Credits',
                         },
-                        'unit_amount': 100,  # $1.00 per credit
+                        'unit_amount': credits * 100,  # Amount in cents
                     },
-                    'quantity': credits,
+                    'quantity': 1,
                 }],
                 mode='payment',
-                success_url=success_url + '?session_id={CHECKOUT_SESSION_ID}',
-                cancel_url=cancel_url,
-                client_reference_id=session['user']['email'],  # Link payment to user
-                metadata={
-                    'credits': credits,
-                    'user_email': session['user']['email']
-                }
+                success_url=url_for('profile', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url=url_for('profile', _external=True)
             )
-            return jsonify({'id': checkout_session.id})
+            return jsonify({'id': session.id})
+
         except Exception as e:
-            app.logger.error(f"Stripe error: {str(e)}")
-            return jsonify(error=str(e)), 403
+            app.logger.error(f"Error creating Stripe session: {str(e)}")
+            return jsonify({"error": "Failed to create checkout session."}), 500
+ 
+            
 
     @app.route('/payment-success')
     def payment_success():
@@ -536,7 +518,9 @@ def create_app():
         return redirect(url_for('profile'))
 
     return app
-
+    
 if __name__ == '__main__':
+    env = os.getenv('FLASK_ENV','development')
+    debug_mode = config[env].DEBUG
     app = create_app()
-    app.run(debug=True)
+    app.run(debug=debug_mode)
