@@ -19,6 +19,7 @@ from forms import RegistrationForm
 import traceback
 from config import config
 import logging
+import email_validator
 
 load_dotenv()  
 
@@ -252,10 +253,11 @@ def create_app():
         form = RegistrationForm()
         if request.method == 'POST':
             if form.validate_on_submit():
-
+                # Check for existing user
                 if User.query.filter_by(email=form.email.data).first():
                     flash('Email already registered. Please login or use a different email.')
                     return redirect(url_for('register'))
+                
 
                 user = User(name=form.name.data, email=form.email.data)
                 user.set_password(form.password.data)
@@ -329,8 +331,6 @@ def create_app():
     @limiter.limit("10 per hour")  # Limit story generation
     def submit():
         csrf_token = request.form.get('csrf_token')
-        print(f"Received CSRF token: {csrf_token}")
-        app.logger.info(f"Recieved CSRF token:{csrf_token}")
         try:
             validate_csrf(csrf_token)
             
