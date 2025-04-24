@@ -12,7 +12,7 @@ from flask_mail import Mail, Message
 import logging
 from datetime import datetime, timedelta
 import secrets
-from flask_wtf.csrf import CSRFProtect, validate_csrf
+from flask_wtf.csrf import CSRFProtect, validate_csrf, CSRFError
 from flask_talisman import Talisman
 import bleach
 from forms import RegistrationForm
@@ -158,7 +158,7 @@ def create_app():
         user_info = None
         credits = 0
         free_tries = 0
-
+        print( "config context stripe pub jkey:" ,app.config['STRIPE_PUBLISHABLE_KEY'])
         if 'user' in session:
             user = User.query.filter_by(email=session['user']['email']).first()
             if user:
@@ -173,7 +173,8 @@ def create_app():
         return render_template('index.html', 
                              user_info=user_info, 
                              credits=credits,
-                             free_tries=free_tries)
+                             free_tries=free_tries,
+                             stripe_publishable_key=app.config['STRIPE_PUBLISHABLE_KEY'])
 
     @app.route('/login', methods=['GET', 'POST'])
     @limiter.limit("10 per hour")  # Limit login attempts
@@ -441,23 +442,25 @@ def create_app():
     @app.route('/create-checkout-session', methods=['POST'])
     @limiter.limit("10 per hour") 
     def create_checkout_session():
-        # csrf_token = request.form.get('csrf_token')
-        # print(f"Received CSRF token: {csrf_token}")
-        # app.logger.info(f"Recieved CSRF token:{csrf_token}")
+        csrf_token = request.headers.get('X-CSRFToken')
+
+        app.logger.info(f"Recieved CSRF token:{csrf_token}")
+        stripe.api_key = app.config['STRIPE_KEY']
+        try:
+            validate_csrf(csrf_token)
+        except CSRFError:
+            return jsonify({'error': 'Invalid CSRF token'}), 400
+        
+        data = request.get_json()
+        credits = int(data['credits'])
 
         try:
-            data = request.get_json()
-            credits = data['credits']
 
-            if not isinstance(credits, (int, str)) or not str(credits).isdigit():
-                return jsonify({"error": "Invalid number of credits requested."}), 400
+            print('credit failure:', credits)
+            
+            app.logger.info(f"Creating Stripe session for {credits} credits, unit amount: {credits * 100}")
+            app.logger.info(f"with key: {stripe.api_key}")
 
-            credits = int(credits)
-            if credits not in [1, 5, 10]:
-                return jsonify({"error": "Invalid credit amount. Choose 1, 5, or 10 credits."}), 400
-
-            stripe.api_key = app.config['STRIPE_KEY']
-            app.logger.debug(f"Stripe key:{stripe.api_key}")
             session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
@@ -466,20 +469,25 @@ def create_app():
                         'product_data': {
                             'name': f'{credits} Credits',
                         },
-                        'unit_amount': credits * 100,  # Amount in cents
+                        'unit_amount':  credits*100,  # Amount in cents
                     },
                     'quantity': 1,
                 }],
                 mode='payment',
-                success_url=url_for('profile', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-                cancel_url=url_for('profile', _external=True)
+                success_url=url_for('payment_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url=url_for('payment_cancel', _external=True)
             )
             return jsonify({'id': session.id})
 
+            # Display a very generic error to the user, and maybe send
+            # yourself an email
+            flash("Error occurred, Notify admin")
+
+            pass
         except Exception as e:
-            app.logger.error(f"Error creating Stripe session: {str(e)}")
-            return jsonify({"error": "Failed to create checkout session."}), 500
- 
+            app.logger.error(f"Stripe error: {e}")
+            return jsonify({'error': str(e)}), 500
+
             
 
     @app.route('/payment-success')

@@ -101,10 +101,13 @@
             </form>
         </div>
 
+        
+        
         {% if user_info %}
         <div class="purchase-credits">
             <h2>Purchase Credits</h2>
-            <div class="credit-options">
+
+            <div class="credit-options" data-stripe-key="{{ stripe_publishable_key }}">
                 <button class="credit-option" data-credits="1">1 Credit - $1</button>
                 <button class="credit-option" data-credits="5">5 Credits - $5</button>
                 <button class="credit-option" data-credits="10">10 Credits - $10</button>

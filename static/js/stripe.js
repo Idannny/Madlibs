@@ -1,15 +1,17 @@
-const stripe = Stripe('{{ config["STRIPE_PUBLISHABLE_KEY"] }}');
-    
-async function purchaseCredits(credits) {
-        console.log("Purchase credit request ")
-    try {
+const stripeKey = document.querySelector('.credit-options').dataset.stripeKey;
+const stripe = Stripe(stripeKey);
 
+async function purchaseCredits(credits, event) {
+
+    try {
         const button = event.target;
         const originalText = button.textContent;
         button.disabled = true;
         button.textContent = 'Processing...';
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        // console.log("CSRF Token:", csrfToken);
+        console.log("stripejs csrf",csrfToken);
+        console.log("stripejs pub ",stripe);
+
         const response = await fetch('/create-checkout-session', {
             method: 'POST',
             headers: {
@@ -18,6 +20,9 @@ async function purchaseCredits(credits) {
             },
             body: JSON.stringify({ credits: credits })
         });
+
+        console.log("in function respi");
+        console.log(response.body);
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
@@ -28,10 +33,14 @@ async function purchaseCredits(credits) {
         const result = await stripe.redirectToCheckout({
             sessionId: session.id
         });
+        console.log('Session ID:', session.id);
+
 
         if (result.error) {
             throw new Error(result.error.message);
         }
+
+    
     } catch (error) {
         console.error('Error:', error);
         alert('There was a problem with your payment. Please try again.');
@@ -45,9 +54,10 @@ async function purchaseCredits(credits) {
 function initializeButtons() {
     const buttons = document.querySelectorAll('.credit-option');
     buttons.forEach(button => {
-        button.addEventListener('click', function() {
-            const credits = this.getAttribute('data-credits');
-            purchaseCredits(credits);
+        button.addEventListener('click', function(event) {
+            const credits =  parseInt(this.getAttribute('data-credits'), 10);
+            console.log('Credits:', credits);
+            purchaseCredits.call(this, credits, event);
         });
     });
 
