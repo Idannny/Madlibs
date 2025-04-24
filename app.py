@@ -304,6 +304,7 @@ def create_app():
             flash('Email is already verified.')
             return redirect(url_for('login'))
         
+        
         send_verification_email(user)
         flash('Verification email has been resent. Please check your inbox.')
         return redirect(url_for('login'))
