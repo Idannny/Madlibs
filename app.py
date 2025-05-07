@@ -327,7 +327,7 @@ def create_app():
                              credits=user.credits,
                              free_tries=user.free_tries_left,
                              stories=stories,
-                             stripe_key=app.config['STRIPE_PUBLISHABLE_KEY'])
+                             stripe_publishable_key=app.config['STRIPE_PUBLISHABLE_KEY'])
 
     @app.route('/submit', methods=['POST'])
     @limiter.limit("10 per hour")  # Limit story generation
@@ -444,7 +444,7 @@ def create_app():
     def create_checkout_session():
         csrf_token = request.headers.get('X-CSRFToken')
 
-        app.logger.info(f"Recieved CSRF token:{csrf_token}")
+        # app.logger.info(f"Recieved CSRF token:{csrf_token}")
         stripe.api_key = app.config['STRIPE_KEY']
         try:
             validate_csrf(csrf_token)
@@ -458,8 +458,8 @@ def create_app():
 
             print('credit failure:', credits)
             
-            app.logger.info(f"Creating Stripe session for {credits} credits, unit amount: {credits * 100}")
-            app.logger.info(f"with key: {stripe.api_key}")
+            # app.logger.info(f"Creating Stripe session for {credits} credits, unit amount: {credits * 100}")
+            # app.logger.info(f"with key: {stripe.api_key}")
 
             session = stripe.checkout.Session.create(
                 payment_method_types=['card'],

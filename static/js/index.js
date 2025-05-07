@@ -27,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingScreen = document.getElementById('loading-screen');
     const resultDiv = document.getElementById('result');
     const submitButton = document.getElementById('submit-button'); 
-    const recaptchaResponse = grecaptcha.getResponse();
     const freeTries = parseInt(form.getAttribute('data-free-tries'), 10);
 
     let recaptchaPassed = false;
