@@ -18,3 +18,4 @@ database_test.py
 mail_test.py
 DEPLOYMENT.md
 *.sql
+database_test.py
