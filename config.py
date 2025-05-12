@@ -52,7 +52,7 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     STRIPE_KEY = os.getenv('STRIPE_KEY')
     STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
-    
+   
     CSP = {
         'connect-src': [
             "'self'",
@@ -74,7 +74,13 @@ class DevelopmentConfig(Config):
     }
 
 class ProductionConfig(Config):
+   
     DEBUG = False
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    STRIPE_KEY = os.getenv('STRIPE_KEY')
+    STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
+
     CSP = {
         'connect-src': [
             "'self'",

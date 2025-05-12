@@ -21,7 +21,7 @@ from config import config
 import logging
 import email_validator
 
-load_dotenv()  
+load_dotenv()
 
 
 def create_app():
